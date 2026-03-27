@@ -1,0 +1,94 @@
+# frostyard/std — Overview
+
+## Purpose
+
+`github.com/frostyard/std` is a Go standard library module for the Frostyard project. It provides shared, reusable packages with **zero external dependencies** (stdlib only). Currently the module contains a single package — `reporter` — which defines a progress-reporting interface and three implementations for human-readable, machine-readable, and silent output.
+
+## Architecture
+
+```
+├── reporter/              # Core package — progress reporting interface + implementations
+│   ├── reporter.go        # Reporter interface definition
+│   ├── event.go           # EventType constants and ProgressEvent struct
+│   ├── text.go            # TextReporter — human-readable output
+│   ├── json.go            # JSONReporter — JSON Lines output (thread-safe)
+│   ├── noop.go            # NoopReporter — silent discard (zero-value)
+│   ├── *_test.go          # One test file per implementation
+├── _examples/             # Runnable example programs
+│   ├── deploy/            # Multi-step deployment pipeline
+│   ├── fileprocess/       # Batch file processing with progress
+│   ├── healthcheck/       # Service health checks with errors/warnings
+│   └── migration/         # Data migration with batches
+├── go.mod                 # Module: github.com/frostyard/std, Go 1.26
+├── Makefile               # Build/test/lint targets
+└── CLAUDE.md              # AI assistant project guidance
+```
+
+For detailed coverage of the reporter package, see [reporter-package.md](reporter-package.md).
+
+## Key Patterns
+
+### Interface-driven design
+
+All consumers depend on the `Reporter` interface, never on concrete types. This allows callers to swap between text, JSON, and noop output without changing application logic.
+
+### Runtime format discrimination via `IsJSON()`
+
+`IsJSON()` is a method on the `Reporter` interface that returns `true` only for `JSONReporter`. Callers use it to decide whether to emit additional human-readable output (tips, decorative separators) alongside the reporter — content that would corrupt a JSON Lines stream.
+
+```go
+if !r.IsJSON() {
+    fmt.Println("Tip: use --format json for machine-readable output")
+}
+```
+
+### Thread safety varies by implementation
+
+| Implementation | Thread-safe | Mechanism |
+|----------------|-------------|-----------|
+| TextReporter   | No          | —         |
+| JSONReporter   | Yes         | `sync.Mutex` on every `emit()` call |
+| NoopReporter   | Yes         | No shared state |
+
+Callers using concurrent goroutines must use `JSONReporter` or `NoopReporter`.
+
+### Constructor conventions
+
+- `NewTextReporter(w io.Writer) *TextReporter` — requires an `io.Writer`
+- `NewJSONReporter(w io.Writer) *JSONReporter` — requires an `io.Writer`
+- `NoopReporter` — zero-value struct, no constructor needed (`NoopReporter{}`)
+
+### Zero external dependencies
+
+The module imports nothing outside the Go standard library. This is a hard constraint — all packages must remain stdlib-only.
+
+### Modern Go (1.26)
+
+The codebase uses modern Go features:
+- `omitzero` struct tags (omit zero-value fields in JSON)
+- `range over int` in examples
+- Standard variadic patterns for formatted messages
+
+### Testing patterns
+
+- One test file per implementation (`text_test.go`, `json_test.go`, `noop_test.go`)
+- Standard `testing` package only — no test frameworks
+- Output captured via `bytes.Buffer`
+- JSON tests unmarshal and validate individual fields (type, message, timestamp presence)
+- Tests verify exact output formatting for text reporter
+
+## Configuration
+
+This module has no configuration files, environment variables, or runtime configuration. Behavior is determined entirely by which `Reporter` implementation is instantiated and what `io.Writer` is passed to its constructor.
+
+Examples use a `-format` command-line flag to select between `text`, `json`, and `noop` output modes.
+
+## Build & Test
+
+```bash
+make check           # Pre-commit gate: fmt + lint + test
+make test            # Run all tests
+make lint            # Run golangci-lint
+make test-cover      # Tests with coverage + HTML report
+make bump            # Tag next semver with svu and push
+```
