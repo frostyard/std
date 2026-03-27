@@ -123,6 +123,33 @@ func TestJSONReporter_Error(t *testing.T) {
 	}
 }
 
+func TestJSONReporter_Error_NilErr(t *testing.T) {
+	var buf bytes.Buffer
+	r := NewJSONReporter(&buf)
+
+	r.Error(nil, "write failed")
+
+	var event ProgressEvent
+	if err := json.Unmarshal(buf.Bytes(), &event); err != nil {
+		t.Fatalf("failed to parse JSON output: %v", err)
+	}
+
+	if event.Type != EventTypeError {
+		t.Errorf("event.Type = %q, want %q", event.Type, EventTypeError)
+	}
+	if event.Message != "write failed" {
+		t.Errorf("event.Message = %q, want %q", event.Message, "write failed")
+	}
+
+	details, ok := event.Details.(map[string]any)
+	if !ok {
+		t.Fatalf("event.Details is %T, want map[string]any", event.Details)
+	}
+	if details["error"] != "<nil>" {
+		t.Errorf("event.Details[error] = %q, want %q", details["error"], "<nil>")
+	}
+}
+
 func TestJSONReporter_Complete(t *testing.T) {
 	var buf bytes.Buffer
 	r := NewJSONReporter(&buf)

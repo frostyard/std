@@ -113,6 +113,19 @@ func TestTextReporter_Error(t *testing.T) {
 	}
 }
 
+func TestTextReporter_Error_NilErr(t *testing.T) {
+	var buf bytes.Buffer
+	r := NewTextReporter(&buf)
+
+	r.Error(nil, "write failed")
+
+	got := buf.String()
+	want := "Error: write failed\n"
+	if got != want {
+		t.Errorf("Error output = %q, want %q", got, want)
+	}
+}
+
 func TestTextReporter_Complete(t *testing.T) {
 	var buf bytes.Buffer
 	r := NewTextReporter(&buf)

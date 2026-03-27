@@ -43,7 +43,11 @@ func (r *TextReporter) Warning(format string, args ...any) {
 }
 
 func (r *TextReporter) Error(err error, message string) {
-	_, _ = fmt.Fprintf(r.w, "Error: %s: %v\n", message, err)
+	if err != nil {
+		_, _ = fmt.Fprintf(r.w, "Error: %s: %v\n", message, err)
+	} else {
+		_, _ = fmt.Fprintf(r.w, "Error: %s\n", message)
+	}
 }
 
 func (r *TextReporter) Complete(message string, _ any) {
