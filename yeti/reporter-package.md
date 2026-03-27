@@ -77,7 +77,7 @@ Human-readable formatted output to an `io.Writer`.
 - **IsJSON():** `false`
 
 **Output formatting:**
-- `Step`: `"Step 1/3: name\n"` — blank line inserted before steps after the first
+- `Step`: `"Step 1/3: name...\n"` — blank line inserted before steps after the first
 - `Progress`: prints non-empty messages only (ignores percent)
 - `Message`: `"  formatted message\n"` (two-space indent)
 - `MessagePlain`: `"formatted message\n"` (no indent)
