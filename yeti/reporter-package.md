@@ -51,7 +51,7 @@ type ProgressEvent struct {
 }
 ```
 
-- `Timestamp` is set at emit time in RFC3339 format
+- `Timestamp` is set at emit time in RFC3339 format (UTC)
 - `omitzero` suppresses zero-value int fields; `omitempty` suppresses empty strings
 - `Details` is `any` — callers can pass structs, maps, or nil
 
@@ -97,7 +97,7 @@ JSON Lines output (one `ProgressEvent` per line) to an `io.Writer`.
 
 **Key behaviors:**
 - Every method constructs a `ProgressEvent` and calls the private `emit()` method
-- `emit()` sets the `Timestamp` field to `time.Now().Format(time.RFC3339)` and encodes via `json.Encoder`
+- `emit()` sets the `Timestamp` field to `time.Now().UTC().Format(time.RFC3339)` and encodes via `json.Encoder`
 - `Message` and `MessagePlain` produce identical output (both use `EventTypeMessage`)
 - `Error` stores error details as `map[string]string{"error": err.Error()}`
 - The mutex lock covers both timestamp generation and encoding
