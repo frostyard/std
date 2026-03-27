@@ -82,7 +82,7 @@ Human-readable formatted output to an `io.Writer`.
 - `Message`: `"  formatted message\n"` (two-space indent)
 - `MessagePlain`: `"formatted message\n"` (no indent)
 - `Warning`: `"Warning: formatted message\n"`
-- `Error`: `"Error: message: err.Error()\n"`
+- `Error`: `"Error: message: err.Error()\n"` (if `err` is nil: `"Error: message\n"`)
 - `Complete`: message surrounded by 65-char `=` separator lines
 
 **Internal state:** `stepped bool` tracks whether `Step()` has been called, to insert blank lines between steps for readability.
@@ -99,7 +99,7 @@ JSON Lines output (one `ProgressEvent` per line) to an `io.Writer`.
 - Every method constructs a `ProgressEvent` and calls the private `emit()` method
 - `emit()` sets the `Timestamp` field to `time.Now().UTC().Format(time.RFC3339)` and encodes via `json.Encoder`
 - `Message` and `MessagePlain` produce identical output (both use `EventTypeMessage`)
-- `Error` stores error details as `map[string]string{"error": err.Error()}`
+- `Error` stores error details as `map[string]string{"error": err.Error()}` (nil errors stored as `"<nil>"`)
 - The mutex lock covers both timestamp generation and encoding
 
 ### NoopReporter (`reporter/noop.go`)

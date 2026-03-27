@@ -19,6 +19,8 @@
 │   ├── fileprocess/       # Batch file processing with progress
 │   ├── healthcheck/       # Service health checks with errors/warnings
 │   └── migration/         # Data migration with batches
+├── .github/
+│   └── dependabot.yml     # Dependabot config (Go modules + GitHub Actions, weekly)
 ├── go.mod                 # Module: github.com/frostyard/std, Go 1.26
 ├── Makefile               # Build/test/lint targets
 └── CLAUDE.md              # AI assistant project guidance
