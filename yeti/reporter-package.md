@@ -99,7 +99,7 @@ JSON Lines output (one `ProgressEvent` per line) to an `io.Writer`.
 - Every method constructs a `ProgressEvent` and calls the private `emit()` method
 - `emit()` sets the `Timestamp` field to `time.Now().UTC().Format(time.RFC3339)` and encodes via `json.Encoder`
 - `Message` and `MessagePlain` produce identical output (both use `EventTypeMessage`)
-- `Error` stores error details as `map[string]string{"error": err.Error()}` (nil errors stored as `"<nil>"`)
+- `Error` stores error details as `map[string]any{"error": err.Error()}` (nil errors emit `null` for clean JSON consumption)
 - The mutex lock covers both timestamp generation and encoding
 
 ### NoopReporter (`reporter/noop.go`)
