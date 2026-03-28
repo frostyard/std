@@ -145,8 +145,8 @@ func TestJSONReporter_Error_NilErr(t *testing.T) {
 	if !ok {
 		t.Fatalf("event.Details is %T, want map[string]any", event.Details)
 	}
-	if details["error"] != "<nil>" {
-		t.Errorf("event.Details[error] = %q, want %q", details["error"], "<nil>")
+	if details["error"] != nil {
+		t.Errorf("event.Details[error] = %v, want nil", details["error"])
 	}
 }
 

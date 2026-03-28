@@ -66,14 +66,14 @@ func (r *JSONReporter) Warning(format string, args ...any) {
 }
 
 func (r *JSONReporter) Error(err error, message string) {
-	errStr := "<nil>"
+	var errVal any
 	if err != nil {
-		errStr = err.Error()
+		errVal = err.Error()
 	}
 	r.emit(ProgressEvent{
 		Type:    EventTypeError,
 		Message: message,
-		Details: map[string]string{"error": errStr},
+		Details: map[string]any{"error": errVal},
 	})
 }
 
