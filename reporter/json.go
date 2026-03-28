@@ -39,7 +39,7 @@ func (r *JSONReporter) Step(step, total int, name string) {
 func (r *JSONReporter) Progress(percent int, message string) {
 	r.emit(ProgressEvent{
 		Type:    EventTypeProgress,
-		Percent: percent,
+		Percent: &percent,
 		Message: message,
 	})
 }

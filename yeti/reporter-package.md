@@ -46,13 +46,14 @@ type ProgressEvent struct {
     TotalSteps int       `json:"total_steps,omitzero"`
     StepName   string    `json:"step_name,omitempty"`
     Message    string    `json:"message,omitempty"`
-    Percent    int       `json:"percent,omitzero"`
+    Percent    *int      `json:"percent,omitempty"`
     Details    any       `json:"details,omitempty"`
 }
 ```
 
 - `Timestamp` is set at emit time in RFC3339 format (UTC)
-- `omitzero` suppresses zero-value int fields; `omitempty` suppresses empty strings
+- `omitzero` suppresses zero-value int fields; `omitempty` suppresses empty strings and nil pointers
+- `Percent` is `*int` so that `nil` means "not reported" (omitted from JSON) while `0` means "zero percent" (included)
 - `Details` is `any` — callers can pass structs, maps, or nil
 
 ### EventType constants
