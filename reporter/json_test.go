@@ -88,11 +88,33 @@ func TestJSONReporter_Progress(t *testing.T) {
 	if event.Type != EventTypeProgress {
 		t.Errorf("event.Type = %q, want %q", event.Type, EventTypeProgress)
 	}
-	if event.Percent != 75 {
-		t.Errorf("event.Percent = %d, want 75", event.Percent)
+	if event.Percent == nil {
+		t.Fatal("event.Percent is nil, want 75")
+	}
+	if *event.Percent != 75 {
+		t.Errorf("event.Percent = %d, want 75", *event.Percent)
 	}
 	if event.Message != "extracting layers" {
 		t.Errorf("event.Message = %q, want %q", event.Message, "extracting layers")
+	}
+}
+
+func TestJSONReporter_ProgressZeroPercent(t *testing.T) {
+	var buf bytes.Buffer
+	r := NewJSONReporter(&buf)
+
+	r.Progress(0, "starting")
+
+	var event ProgressEvent
+	if err := json.Unmarshal(buf.Bytes(), &event); err != nil {
+		t.Fatalf("failed to parse JSON output: %v", err)
+	}
+
+	if event.Percent == nil {
+		t.Fatal("event.Percent is nil, want 0 — zero percent should be present in JSON output")
+	}
+	if *event.Percent != 0 {
+		t.Errorf("event.Percent = %d, want 0", *event.Percent)
 	}
 }
 

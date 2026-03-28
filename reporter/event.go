@@ -20,6 +20,6 @@ type ProgressEvent struct {
 	TotalSteps int       `json:"total_steps,omitzero"`
 	StepName   string    `json:"step_name,omitempty"`
 	Message    string    `json:"message,omitempty"`
-	Percent    int       `json:"percent,omitzero"`
+	Percent    *int      `json:"percent,omitempty"`
 	Details    any       `json:"details,omitempty"`
 }

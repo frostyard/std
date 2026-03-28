@@ -75,7 +75,7 @@ The module imports nothing outside the Go standard library. This is a hard const
 ### Modern Go (1.26)
 
 The codebase uses modern Go features:
-- `omitzero` struct tags (omit zero-value fields in JSON)
+- `omitzero` struct tags (omit zero-value fields in JSON); `*int` with `omitempty` where zero is a valid value
 - `range over int` in examples
 - Standard variadic patterns for formatted messages
 
