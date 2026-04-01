@@ -72,11 +72,17 @@ Callers using concurrent goroutines must use `JSONReporter` or `NoopReporter`.
 
 The module imports nothing outside the Go standard library. This is a hard constraint — all packages must remain stdlib-only.
 
+### Nil/zero-value handling in JSON output
+
+Two important design decisions for correct JSON serialization:
+- `ProgressEvent.Percent` is `*int` (not `int`) so that 0% is distinguishable from "not reported" — `nil` omits the field, `&0` emits `"percent": 0`
+- `JSONReporter.Error()` with `nil` error emits `{"error": null}` (not `{"error": "<nil>"}`) — the details map is always present for consistent downstream parsing
+
 ### Modern Go (1.26)
 
 The codebase uses modern Go features:
 - `omitzero` struct tags (omit zero-value fields in JSON); `*int` with `omitempty` where zero is a valid value
-- `range over int` in examples
+- `range over int` in examples (e.g., `for batch := range batches` in migration example)
 - Standard variadic patterns for formatted messages
 
 ### Testing patterns

@@ -100,7 +100,7 @@ JSON Lines output (one `ProgressEvent` per line) to an `io.Writer`.
 - Every method constructs a `ProgressEvent` and calls the private `emit()` method
 - `emit()` sets the `Timestamp` field to `time.Now().UTC().Format(time.RFC3339)` and encodes via `json.Encoder`
 - `Message` and `MessagePlain` produce identical output (both use `EventTypeMessage`)
-- `Error` stores error details as `map[string]any{"error": err.Error()}` (nil errors emit `null` for clean JSON consumption)
+- `Error` always stores details as `map[string]any{"error": ...}` where the value is `err.Error()` string when err is non-nil, or `nil` (serialized as JSON `null`) when err is nil — this ensures the `"details"` key is always present for consistent downstream parsing
 - The mutex lock covers both timestamp generation and encoding
 
 ### NoopReporter (`reporter/noop.go`)
@@ -112,6 +112,22 @@ Silent discard — all methods are empty no-ops.
 - **IsJSON():** `false`
 
 Useful for tests, benchmarks, or contexts where progress output should be suppressed.
+
+## Examples (`_examples/`)
+
+Four runnable examples demonstrate reporter usage patterns. Each accepts a `-format` flag (`text`, `json`, `noop`) and uses a `switch` block to instantiate the appropriate `Reporter` implementation.
+
+| Example | Demonstrates |
+|---------|-------------|
+| `deploy/` | Multi-step pipeline: `Step`, `Message`, `Warning`, `Complete` with structured details |
+| `fileprocess/` | Batch processing with `Progress`, `IsJSON()` guard for human-only tips |
+| `healthcheck/` | Error/warning handling: `Error` with real errors, `Warning`, `MessagePlain` |
+| `migration/` | Batch progress with `range over int`, `Progress` percentage updates, `Warning` for skips |
+
+Key patterns visible in examples:
+- **Reporter factory switch**: all examples use the same `switch *format` pattern — the planned `clix` module will replace this with a `NewReporter()` factory
+- **`IsJSON()` guard**: `fileprocess` shows the idiomatic pattern for suppressing human-only output
+- **Structured `Complete` details**: `deploy` and `migration` pass typed structs as details; others pass `nil`
 
 ## Adding a new Reporter implementation
 
