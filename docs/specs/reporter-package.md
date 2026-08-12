@@ -4,6 +4,10 @@
 
 Package `reporter` (`github.com/frostyard/std/reporter`) defines a `Reporter` interface for progress reporting and provides three implementations. It is designed for CLI tools and services that need to communicate step-by-step progress to users or downstream systems.
 
+This spec pins the exact interface, serialization format, and output
+formatting; the how-it-fits-together narrative lives in
+[../design/overview.md](../design/overview.md).
+
 ## Reporter Interface
 
 Defined in `reporter/reporter.go`:
@@ -125,7 +129,7 @@ Four runnable examples demonstrate reporter usage patterns. Each accepts a `-for
 | `migration/` | Batch progress with `range over int`, `Progress` percentage updates, `Warning` for skips |
 
 Key patterns visible in examples:
-- **Reporter factory switch**: all examples use the same `switch *format` pattern — the planned `clix` module will replace this with a `NewReporter()` factory
+- **Reporter factory switch**: all examples use the same `switch *format` pattern — the [clix](https://github.com/frostyard/clix) module wraps this in a `NewReporter()` factory for consuming CLIs
 - **`IsJSON()` guard**: `fileprocess` shows the idiomatic pattern for suppressing human-only output
 - **Structured `Complete` details**: `deploy` and `migration` pass typed structs as details; others pass `nil`
 

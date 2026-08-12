@@ -19,22 +19,23 @@
 │   ├── fileprocess/       # Batch file processing with progress
 │   ├── healthcheck/       # Service health checks with errors/warnings
 │   └── migration/         # Data migration with batches
-├── docs/plans/            # Design documents and implementation plans
-│   ├── 2026-03-04-clix-design.md          # clix CLI convenience module design
-│   ├── 2026-03-04-clix-implementation.md  # clix implementation plan
-│   ├── 2026-03-04-reporter-examples-design.md
-│   ├── 2026-03-04-reporter-examples.md
-│   ├── 2026-03-04-reporter-extraction-design.md
-│   └── 2026-03-04-reporter-extraction.md
+├── docs/                  # All docs, core's four-category shape (formerly yeti/)
+│   ├── README.md          # Category table + index of every doc
+│   ├── org-adrs.md        # Core ADRs binding this repo
+│   ├── adr/               # Repo-local decisions (none yet)
+│   ├── design/            # Living architecture docs — this file
+│   ├── specs/             # Exact contracts — reporter-package.md
+│   └── plans/             # Design documents and implementation plans
 ├── .github/
 │   └── dependabot.yml     # Dependabot config (Go modules + GitHub Actions, weekly)
 ├── .svu.yaml              # svu (semantic version utility) config for `make bump`
 ├── go.mod                 # Module: github.com/frostyard/std, Go 1.26
 ├── Makefile               # Build/test/lint targets
-└── CLAUDE.md              # AI assistant project guidance
+└── AGENTS.md              # Canonical agent instructions (CLAUDE.md/GEMINI.md/.cursorrules symlink to it)
 ```
 
-For detailed coverage of the reporter package, see [reporter-package.md](reporter-package.md).
+For the reporter package's exact interface and output contract, see
+[../specs/reporter-package.md](../specs/reporter-package.md).
 
 ## Key Patterns
 
@@ -109,14 +110,14 @@ make test-cover      # Tests with coverage + HTML report
 make bump            # Tag next semver with svu and push
 ```
 
-## Related Design Documents
+## Related Plans
 
-Design documents in `docs/plans/` provide context for planned and past work:
+Documents in [../plans/](../plans/) provide context for planned and past work:
 
-- **clix module** (`2026-03-04-clix-design.md`, `2026-03-04-clix-implementation.md`) — A planned separate module (`github.com/frostyard/clix`) that provides CLI convenience functions (version strings, common flags, JSON output helpers, reporter factory) built on fang/cobra. Separate from `std` because it has external dependencies. Three Frostyard CLI tools (nbc, updex, intuneme) are intended consumers.
-- **reporter extraction** (`2026-03-04-reporter-extraction-design.md`, `2026-03-04-reporter-extraction.md`) — Design for extracting the reporter package into this standalone module.
-- **reporter examples** (`2026-03-04-reporter-examples-design.md`, `2026-03-04-reporter-examples.md`) — Design for the `_examples/` directory demonstrating reporter usage patterns.
+- **clix module** ([2026-03-04-clix-design.md](../plans/2026-03-04-clix-design.md), [2026-03-04-clix-implementation.md](../plans/2026-03-04-clix-implementation.md)) — A planned separate module (`github.com/frostyard/clix`) that provides CLI convenience functions (version strings, common flags, JSON output helpers, reporter factory) built on fang/cobra. Separate from `std` because it has external dependencies. Three Frostyard CLI tools (nbc, updex, intuneme) are intended consumers. Shipped as [frostyard/clix](https://github.com/frostyard/clix).
+- **reporter extraction** ([2026-03-04-reporter-extraction-design.md](../plans/2026-03-04-reporter-extraction-design.md), [2026-03-04-reporter-extraction.md](../plans/2026-03-04-reporter-extraction.md)) — Design for extracting the reporter package into this standalone module.
+- **reporter examples** ([2026-03-04-reporter-examples-design.md](../plans/2026-03-04-reporter-examples-design.md), [2026-03-04-reporter-examples.md](../plans/2026-03-04-reporter-examples.md)) — Design for the `_examples/` directory demonstrating reporter usage patterns.
 
 ## Downstream Consumers
 
-The `reporter` package is used by Frostyard CLI tools including `nbc`, `updex`, and `intuneme`. These tools use the `Reporter` interface for progress output during operations like disk management, package updates, and Intune management. The planned `clix` module will provide a `NewReporter()` factory that selects the implementation based on a `--json` flag.
+The `reporter` package is used by Frostyard CLI tools including `nbc`, `updex`, and `intuneme`. These tools use the `Reporter` interface for progress output during operations like disk management, package updates, and Intune management. The [clix](https://github.com/frostyard/clix) module provides a `NewReporter()` factory that selects the implementation based on `--json`/`--silent` flags.
