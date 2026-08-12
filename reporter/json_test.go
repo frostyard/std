@@ -4,7 +4,9 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"strconv"
 	"strings"
+	"sync"
 	"testing"
 )
 
@@ -217,6 +219,50 @@ func TestJSONReporter_MultipleEvents(t *testing.T) {
 	}
 	if event2.Type != EventTypeMessage {
 		t.Errorf("second event type = %q, want %q", event2.Type, EventTypeMessage)
+	}
+}
+
+func TestJSONReporter_ConcurrentMessages(t *testing.T) {
+	const messageCount = 64
+
+	var buf bytes.Buffer
+	r := NewJSONReporter(&buf)
+
+	var wg sync.WaitGroup
+	for i := range messageCount {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			r.Message("message %d", i)
+		}()
+	}
+	wg.Wait()
+
+	lines := strings.Split(strings.TrimSpace(buf.String()), "\n")
+	if len(lines) != messageCount {
+		t.Fatalf("expected %d JSON lines, got %d: %q", messageCount, len(lines), buf.String())
+	}
+
+	messages := make(map[string]bool, messageCount)
+	for _, line := range lines {
+		var event ProgressEvent
+		if err := json.Unmarshal([]byte(line), &event); err != nil {
+			t.Fatalf("failed to parse JSON line %q: %v", line, err)
+		}
+		if event.Type != EventTypeMessage {
+			t.Errorf("event.Type = %q, want %q", event.Type, EventTypeMessage)
+		}
+		if event.Timestamp == "" {
+			t.Error("event.Timestamp should not be empty")
+		}
+		messages[event.Message] = true
+	}
+
+	for i := range messageCount {
+		message := "message " + strconv.Itoa(i)
+		if !messages[message] {
+			t.Errorf("missing message %q", message)
+		}
 	}
 }
 
