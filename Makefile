@@ -13,7 +13,7 @@ fmt:
 
 ## lint: Run linter
 lint:
-	@golangci-lint run || echo "golangci-lint not installed, skipping"
+	@if command -v golangci-lint >/dev/null 2>&1; then golangci-lint run; else echo "golangci-lint not installed, skipping"; fi
 
 ## test: Run tests
 test:
