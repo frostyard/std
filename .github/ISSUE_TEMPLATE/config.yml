@@ -1,5 +1,1 @@
 blank_issues_enabled: true
-contact_links:
-  - name: Question or discussion
-    url: https://github.com/frostyard/std/discussions
-    about: Ask questions and discuss using the std packages here.
