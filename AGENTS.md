@@ -48,7 +48,8 @@ whichever agent you are:
 - `make`
 - [`golangci-lint`](https://golangci-lint.run/) v2 for `make lint`
   (configured by [`.golangci.yml`](.golangci.yml); the Makefile prints a
-  skip notice when it is absent, CI always runs it)
+  skip notice when it is absent and fails on findings when it is present,
+  CI always runs it)
 - [`svu`](https://github.com/caarlos0/svu) only for `make bump`
 - Node 20+ only for `node scripts/check-docs.mjs` (zero dependencies)
 
