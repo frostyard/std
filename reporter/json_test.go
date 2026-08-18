@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"math"
 	"strconv"
 	"strings"
 	"sync"
@@ -191,6 +192,76 @@ func TestJSONReporter_Complete(t *testing.T) {
 	if event.Message != "done" {
 		t.Errorf("event.Message = %q, want %q", event.Message, "done")
 	}
+}
+
+func TestJSONReporter_Complete_UnencodableDetails(t *testing.T) {
+	cases := []struct {
+		name    string
+		details any
+	}{
+		{name: "func", details: func() {}},
+		{name: "NaN", details: math.NaN()},
+		{name: "channel", details: make(chan int)},
+		{name: "failing marshaler", details: failingMarshaler{}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			var buf bytes.Buffer
+			r := NewJSONReporter(&buf)
+
+			r.Complete("done", tc.details)
+
+			lines := strings.Split(strings.TrimSpace(buf.String()), "\n")
+			if len(lines) != 1 {
+				t.Fatalf("got %d lines, want exactly 1:\n%s", len(lines), buf.String())
+			}
+			var event ProgressEvent
+			if err := json.Unmarshal([]byte(lines[0]), &event); err != nil {
+				t.Fatalf("failed to parse JSON output: %v", err)
+			}
+			if event.Type != EventTypeComplete {
+				t.Errorf("event.Type = %q, want %q", event.Type, EventTypeComplete)
+			}
+			if event.Message != "done" {
+				t.Errorf("event.Message = %q, want %q", event.Message, "done")
+			}
+			if event.Timestamp == "" {
+				t.Error("event.Timestamp should not be empty")
+			}
+			details, ok := event.Details.(map[string]any)
+			if !ok {
+				t.Fatalf("event.Details = %T, want map[string]any", event.Details)
+			}
+			reason, ok := details["encoding_error"].(string)
+			if !ok || reason == "" {
+				t.Errorf("details[\"encoding_error\"] = %#v, want non-empty string", details["encoding_error"])
+			}
+		})
+	}
+}
+
+// failingMarshaler is a json.Marshaler whose MarshalJSON always fails, so the
+// encoder surfaces a *json.MarshalerError.
+type failingMarshaler struct{}
+
+func (failingMarshaler) MarshalJSON() ([]byte, error) {
+	return nil, errors.New("marshal refused")
+}
+
+func TestJSONReporter_WriterErrorIsSilent(t *testing.T) {
+	r := NewJSONReporter(failingWriter{})
+
+	// Neither a normal event nor an unencodable one may panic or block when
+	// the writer itself fails; the reporter has no channel to report it.
+	r.Complete("done", map[string]string{"device": "/dev/sda"})
+	r.Complete("done", func() {})
+}
+
+// failingWriter is an io.Writer whose Write always fails.
+type failingWriter struct{}
+
+func (failingWriter) Write([]byte) (int, error) {
+	return 0, errors.New("write refused")
 }
 
 func TestJSONReporter_MultipleEvents(t *testing.T) {

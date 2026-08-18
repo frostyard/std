@@ -105,7 +105,9 @@ JSON Lines output (one `ProgressEvent` per line) to an `io.Writer`.
 - `emit()` sets the `Timestamp` field to `time.Now().UTC().Format(time.RFC3339)` and encodes via `json.Encoder`
 - `Message` and `MessagePlain` produce identical output (both use `EventTypeMessage`)
 - `Error` always stores details as `map[string]any{"error": ...}` where the value is `err.Error()` string when err is non-nil, or `nil` (serialized as JSON `null`) when err is nil — this ensures the `"details"` key is always present for consistent downstream parsing
-- The mutex lock covers both timestamp generation and encoding
+- The mutex lock covers both timestamp generation and encoding (including the fallback encode below)
+- **Encode failure:** if `json.Encoder.Encode` fails because the caller-supplied `Details` value is not JSON-encodable (`*json.UnsupportedTypeError` for a func or channel, `*json.UnsupportedValueError` for NaN/±Inf, `*json.MarshalerError` for a failing `json.Marshaler`, matched with `errors.As`), `emit()` re-encodes the same event with `Details` replaced by `map[string]any{"encoding_error": err.Error()}` — `Type`, `Timestamp`, `Message`, and step fields are unchanged — so the line (in particular the terminal `complete` event) still reaches the stream as a valid `ProgressEvent`. `json.Encoder` marshals the whole value before writing, so a failed encode leaves nothing on the wire and exactly one line is emitted
+- **Writer failure:** errors returned by the underlying `io.Writer` are discarded; a progress stream has no channel to report its own transport failure and must never abort the caller
 
 ### NoopReporter (`reporter/noop.go`)
 
