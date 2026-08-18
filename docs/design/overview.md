@@ -19,19 +19,35 @@
 │   ├── fileprocess/       # Batch file processing with progress
 │   ├── healthcheck/       # Service health checks with errors/warnings
 │   └── migration/         # Data migration with batches
+├── tests/e2e/             # E2E suite: builds and runs every _examples/* program in every mode
 ├── docs/                  # All docs, core's four-category shape (formerly yeti/)
 │   ├── README.md          # Category table + index of every doc
 │   ├── org-adrs.md        # Core ADRs binding this repo
-│   ├── adr/               # Repo-local decisions (none yet)
-│   ├── design/            # Living architecture docs — this file
-│   ├── specs/             # Exact contracts — reporter-package.md
-│   └── plans/             # Design documents and implementation plans
+│   ├── adr/               # Repo-local decisions — 0001 (conformance aliases)
+│   ├── design/            # Living architecture docs — this file, quality-loop.md
+│   ├── specs/             # Exact contracts — reporter-package.md, PR rubric, PR metric
+│   ├── plans/             # Design documents and implementation plans
+│   └── metrics.md, review-rubric.md, quality.md   # conformance aliases (ADR-0001)
 ├── .github/
+│   ├── workflows/ci.yml   # Lint, Unit Tests, Race Detection, Verify, Docs integrity
+│   ├── workflows/release.yml  # On tag push: changelog-only GoReleaser release
+│   ├── pull_request_template.md, ISSUE_TEMPLATE/, prompts/
+│   ├── copilot-instructions.md -> ../AGENTS.md
 │   └── dependabot.yml     # Dependabot config (Go modules + GitHub Actions, weekly)
+├── policies/agent-governance.json  # Fluent enrollment surface (core repository-surfaces v1)
+├── scripts/check-docs.mjs # Docs-integrity gate (index, links, aliases; .coverage-thresholds.json)
+├── .agents/skills/        # Skills synced from frostyard/core (.claude/skills -> here)
+├── .memory/               # Corrections inbox (append-only corrections.jsonl)
+├── .claude/               # settings.json (tool-layer limits), session-summary.md
+├── .goreleaser.yaml       # builds skipped; changelog grouped by commit type
 ├── .svu.yaml              # svu (semantic version utility) config for `make bump`
+├── .golangci.yml          # What `make lint` and CI run (v2, standard + gofmt)
+├── .editorconfig
 ├── go.mod                 # Module: github.com/frostyard/std, Go 1.26
 ├── Makefile               # Build/test/lint targets
-└── AGENTS.md              # Canonical agent instructions (CLAUDE.md/GEMINI.md/.cursorrules symlink to it)
+└── AGENTS.md              # Canonical agent instructions + contributing guide
+                           # (CLAUDE.md, GEMINI.md, CONTRIBUTING.md, .cursorrules,
+                           #  .github/copilot-instructions.md symlink to it)
 ```
 
 For the reporter package's exact interface and output contract, see
@@ -93,6 +109,7 @@ The codebase uses modern Go features:
 - Output captured via `bytes.Buffer`
 - JSON tests unmarshal and validate individual fields (type, message, timestamp presence)
 - Tests verify exact output formatting for text reporter
+- End-to-end: `tests/e2e/examples_test.go` builds each `_examples/*` program and runs it as a subprocess in `json`, `text`, `noop`, and an invalid format, decoding the JSON Lines stream with `reporter.ProgressEvent` (unknown fields rejected; last event `complete`). `go test ./...` skips underscore directories, so this is the only thing that compiles the examples ([tests/e2e/README.md](../../tests/e2e/README.md)).
 
 ## Configuration
 
@@ -104,11 +121,36 @@ Examples use a `-format` command-line flag to select between `text`, `json`, and
 
 ```bash
 make check           # Pre-commit gate: fmt + lint + test
-make test            # Run all tests
-make lint            # Run golangci-lint
+make test            # Run all tests (unit + tests/e2e)
+make lint            # Run golangci-lint (.golangci.yml)
 make test-cover      # Tests with coverage + HTML report
-make bump            # Tag next semver with svu and push
+make bump            # Tag next semver with svu and push (triggers release.yml)
+node scripts/check-docs.mjs   # Docs-integrity gate
 ```
+
+CI (`.github/workflows/ci.yml`) runs Lint, Unit Tests, Race Detection,
+Verify (tidy/vet/gofmt), and Docs integrity on every PR and push to `main`;
+the loop around it — template, rubric, gates, corrections, metric, release
+path — is described in [quality-loop.md](quality-loop.md).
+
+## Release
+
+`make bump` tags the next semver (svu, `.svu.yaml`) and pushes the tag;
+`.github/workflows/release.yml` then runs GoReleaser Pro with
+`.goreleaser.yaml` — builds skipped, changelog grouped by Conventional Commit
+type, GitHub release under `frostyard/std` (`prerelease: auto`). Consumers
+fetch tags through the Go module proxy; nothing else is published.
+
+## Agent governance
+
+`policies/agent-governance.json` is std's agent-governance surface under
+frostyard/core's repository-surfaces contract v1 — with `AGENTS.md`,
+`.agents/skills/`, and `docs/README.md` it is what Fluent reads to enroll the
+repository. Deny by default; read/write/run-tests allowed; issues, PRs, and
+follow-ups review-required; `.github/workflows/**` and the release surface
+are review-required at high risk. `.claude/settings.json` enforces the same
+limits at the tool layer. Rationale:
+[ADR-0001](../adr/0001-acmm-conformance-via-canonical-aliases.md).
 
 ## Related Plans
 

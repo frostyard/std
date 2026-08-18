@@ -14,19 +14,31 @@ shape, [core ADR-0025](https://github.com/frostyard/core/blob/main/docs/adr/0025
 
 ### Decisions (ADRs)
 
-*(none yet — org-wide decisions binding this repo are listed in
-[org-adrs.md](org-adrs.md))*
+Org-wide decisions binding this repo are listed in [org-adrs.md](org-adrs.md).
+
+- [0001 — ACMM conformance via canonical aliases](adr/0001-acmm-conformance-via-canonical-aliases.md)
+  — one canonical file per criterion behind committed relative symlinks
+  (the alias registry), real trees for directory criteria, the docs-integrity
+  gate, and the CI, release, and agent-governance surfaces added with it
 
 ### Design
 
 - [Overview](design/overview.md) — purpose, architecture, key patterns,
   configuration, downstream consumers (the entry-point doc)
+- [Quality loop](design/quality-loop.md) — declare → review → gate → learn →
+  observe, wired to `ci.yml`, the docs gate, `.memory/`, and the release path
+  (`docs/quality.md` is its alias)
 
 ### Specs
 
 - [Reporter package](specs/reporter-package.md) — the `Reporter` interface,
   `ProgressEvent` JSON Lines format, and exact per-implementation output
   formatting
+- [PR review rubric](specs/pr-review-rubric.md) — the checklist every review
+  applies, rows = the repo's verifiable gates (`docs/review-rubric.md` is its
+  alias)
+- [PR acceptance metric](specs/pr-acceptance-metric.md) — the monthly
+  acceptance-rate definition and rules (`docs/metrics.md` is its alias)
 
 ### Plans
 
@@ -54,4 +66,9 @@ Shipped work; kept for the decision context they carry:
 - Design docs are updated in place to always reflect reality.
 - Specs change only alongside the code that implements them.
 - Cross-links between categories are mandatory in both directions.
-- Adding a doc means adding it to the index above.
+- Adding a doc means adding it to the index above; `node
+  scripts/check-docs.mjs` (CI's `docs-gate` job) fails on an unindexed doc,
+  a dead relative link, or a broken alias.
+- Conformance aliases (`docs/metrics.md`, `docs/review-rubric.md`,
+  `docs/quality.md` — [ADR-0001](adr/0001-acmm-conformance-via-canonical-aliases.md))
+  are not docs: never index or edit them; edit their targets.

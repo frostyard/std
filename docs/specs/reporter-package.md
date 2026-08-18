@@ -133,6 +133,13 @@ Key patterns visible in examples:
 - **`IsJSON()` guard**: `fileprocess` shows the idiomatic pattern for suppressing human-only output
 - **Structured `Complete` details**: `deploy` and `migration` pass typed structs as details; others pass `nil`
 
+The e2e suite in [tests/e2e/](../../tests/e2e/README.md) builds every
+example and runs it in each format, checking the JSON Lines stream against
+`ProgressEvent` (unknown fields rejected, RFC3339 timestamps, last event
+`complete`) and the exit codes above; a change to this contract must keep it
+green. The [PR review rubric](pr-review-rubric.md) requires exact-output
+changes to update this spec in the same PR.
+
 ## Adding a new Reporter implementation
 
 1. Create a new file `reporter/<name>.go` with a struct implementing all `Reporter` interface methods
