@@ -1,0 +1,27 @@
+version: "2"
+
+# Code style configuration for golangci-lint (v2 schema). `make lint` runs
+# `golangci-lint run`, which picks this file up; CI's Lint job runs the same
+# binary against the same file so local and CI findings agree.
+
+linters:
+  # The standard set: errcheck, govet, ineffassign, staticcheck, unused.
+  default: standard
+  exclusions:
+    presets:
+      - comments
+      - common-false-positives
+      - legacy
+      - std-error-handling
+    rules:
+      - path: _test\.go$
+        linters:
+          - errcheck
+
+formatters:
+  enable:
+    - gofmt
+
+issues:
+  max-issues-per-linter: 0
+  max-same-issues: 0

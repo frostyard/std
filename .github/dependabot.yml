@@ -4,3 +4,9 @@ updates:
     directory: /
     schedule:
       interval: weekly
+  # Restored now that .github/workflows/ exists (it was dropped in #16 while
+  # the repo had no workflows): keeps the SHA-pinned actions current.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly

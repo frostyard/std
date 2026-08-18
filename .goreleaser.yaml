@@ -1,0 +1,60 @@
+# GoReleaser configuration for frostyard/std — a Go library.
+#
+# There is no binary to build: `make bump` tags the next semver (svu) and
+# pushes the tag; .github/workflows/release.yml then runs
+# `goreleaser release --clean`, which skips builds and archives and creates a
+# GitHub release whose body is the changelog grouped by Conventional Commit
+# type. Nothing is published anywhere else; consumers fetch the tag through
+# the Go module proxy.
+#
+# yaml-language-server: $schema=https://goreleaser.com/static/schema-pro.json
+
+version: 2
+pro: true
+
+project_name: std
+
+builds:
+  # Library: no binaries, archives, checksums, or packages.
+  - skip: true
+
+changelog:
+  sort: asc
+  use: github
+  filters:
+    exclude:
+      - "^test:"
+      - "^chore"
+      - "merge conflict"
+      - Merge pull request
+      - Merge remote-tracking branch
+      - Merge branch
+      - go mod tidy
+  groups:
+    - title: Dependency updates
+      regexp: "^.*feat\\(deps\\)*:+.*$"
+      order: 300
+    - title: "New Features"
+      regexp: "^.*feat[(\\w)]*:+.*$"
+      order: 100
+    - title: "Bug fixes"
+      regexp: "^.*fix[(\\w)]*:+.*$"
+      order: 200
+    - title: "Documentation updates"
+      regexp: "^.*docs[(\\w)]*:+.*$"
+      order: 400
+    - title: Other work
+      order: 9999
+
+release:
+  github:
+    owner: frostyard
+    name: std
+  # Tags such as v1.2.0-rc1 become GitHub pre-releases.
+  prerelease: auto
+  footer: |
+    **Full Changelog**: https://github.com/frostyard/{{ .ProjectName }}/compare/{{ .PreviousTag }}...{{ .Tag }}
+
+    ---
+
+    _Released with [GoReleaser Pro](https://goreleaser.com/pro)!_
