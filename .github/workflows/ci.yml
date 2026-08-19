@@ -78,7 +78,7 @@ jobs:
       # gate without a commit. Dependency-free module, so the signal is
       # reachable Go standard-library advisories.
       - name: Install pinned govulncheck
-        run: go install golang.org/x/vuln/cmd/govulncheck@v1.6.0
+        run: go install golang.org/x/vuln/cmd/govulncheck@v1.7.0
 
       - name: Run govulncheck
         run: govulncheck ./...
