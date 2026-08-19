@@ -35,8 +35,8 @@ PR template ──► review rubric ──► CI gates ──► corrections ─
   task-shaped form for agents. Maintainers remain accountable for the merge
   decision.
 - **Gate** — [.github/workflows/ci.yml](../../.github/workflows/ci.yml)
-  runs on every PR and push to `main`, SHA-pinned with least-privilege
-  permissions:
+  runs on every PR, every push to `main`, and every merge-queue branch
+  (`merge_group`), SHA-pinned with least-privilege permissions:
   - *Lint* — golangci-lint v2 configured by
     [`.golangci.yml`](../../.golangci.yml) (`standard` linters, `gofmt`
     formatter); the same file `make lint` uses. The release is pinned as

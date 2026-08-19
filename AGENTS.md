@@ -147,7 +147,8 @@ interface; they double as the e2e fixtures.
 ## Continuous integration
 
 [`.github/workflows/ci.yml`](.github/workflows/ci.yml) runs on every push to
-`main` and every pull request: **Lint** (the `GOLANGCI_LINT_VERSION` release
+`main`, every pull request, and every merge-queue branch (`merge_group`):
+**Lint** (the `GOLANGCI_LINT_VERSION` release
 of golangci-lint from the `Makefile`, with `.golangci.yml`, over the module
 and the `_examples/` programs), **Security Scan** (`govulncheck ./...` with
 `golang.org/x/vuln/cmd/govulncheck@v1.7.0` pinned — reachable Go
