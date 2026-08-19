@@ -147,7 +147,10 @@ interface; they double as the e2e fixtures.
 [`.github/workflows/ci.yml`](.github/workflows/ci.yml) runs on every push to
 `main` and every pull request: **Lint** (the `GOLANGCI_LINT_VERSION` release
 of golangci-lint from the `Makefile`, with `.golangci.yml`, over the module
-and the `_examples/` programs), **Unit Tests** (`go test -v ./...`),
+and the `_examples/` programs), **Security Scan** (`govulncheck ./...` with
+`golang.org/x/vuln/cmd/govulncheck@v1.6.0` pinned — reachable Go
+standard-library advisories, since the module has no dependencies), **Unit
+Tests** (`go test -v ./...`),
 **Race Detection** (`go test -race -short ./...`), **Verify** (`go mod tidy`
 leaves no diff, `go vet` over the module and the `_examples/` programs,
 `gofmt -l` empty), and **Docs integrity** (`node

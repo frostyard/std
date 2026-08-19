@@ -46,6 +46,10 @@ PR template ──► review rubric ──► CI gates ──► corrections ─
     commit. It runs twice: once over the packages `./...` matches, once over
     the [`_examples/`](#example-programs-are-analyzed-explicitly) program
     directories.
+  - *Security Scan* — `govulncheck ./...` with
+    `golang.org/x/vuln/cmd/govulncheck@v1.6.0` pinned (the same job clix and
+    updex run): with no dependencies the signal is a reachable Go
+    standard-library advisory, which every consumer of `reporter` inherits.
   - *Unit Tests* — `go test -v ./...`: `reporter/` unit tests plus the
     [e2e suite](../../tests/e2e/README.md), which builds and runs every
     `_examples/*` program in every output mode.
