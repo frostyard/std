@@ -11,6 +11,9 @@ import (
 	"bufio"
 	"bytes"
 	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -189,10 +192,8 @@ func decodeEvents(t *testing.T, stream string) []reporter.ProgressEvent {
 			t.Errorf("line %d: blank line inside JSON Lines stream", line)
 			continue
 		}
-		dec := json.NewDecoder(bytes.NewReader(raw))
-		dec.DisallowUnknownFields()
-		var ev reporter.ProgressEvent
-		if err := dec.Decode(&ev); err != nil {
+		ev, err := decodeEventLine(raw)
+		if err != nil {
 			t.Errorf("line %d: %v: %s", line, err, raw)
 			continue
 		}
@@ -202,6 +203,61 @@ func decodeEvents(t *testing.T, stream string) []reporter.ProgressEvent {
 		t.Fatal(err)
 	}
 	return events
+}
+
+func decodeEventLine(raw []byte) (reporter.ProgressEvent, error) {
+	dec := json.NewDecoder(bytes.NewReader(raw))
+	dec.DisallowUnknownFields()
+	var ev reporter.ProgressEvent
+	if err := dec.Decode(&ev); err != nil {
+		return reporter.ProgressEvent{}, err
+	}
+	var trailing any
+	switch err := dec.Decode(&trailing); err {
+	case io.EOF:
+		return ev, nil
+	case nil:
+		return reporter.ProgressEvent{}, errors.New("multiple JSON values on one JSON Lines line")
+	default:
+		return reporter.ProgressEvent{}, fmt.Errorf("trailing content after ProgressEvent: %w", err)
+	}
+}
+
+func TestDecodeEventLine(t *testing.T) {
+	valid := `{"type":"message","timestamp":"2026-08-19T12:00:00Z","message":"ready"}`
+	another := `{"type":"complete","timestamp":"2026-08-19T12:00:01Z"}`
+	tests := []struct {
+		name        string
+		line        string
+		wantErr     bool
+		errContains string
+	}{
+		{name: "single event", line: valid},
+		{name: "single event with whitespace", line: valid + " \t"},
+		{name: "concatenated second event", line: valid + another, wantErr: true, errContains: "multiple JSON values"},
+		{name: "space-separated second event", line: valid + " " + another, wantErr: true, errContains: "multiple JSON values"},
+		{name: "trailing junk", line: valid + " not-json", wantErr: true, errContains: "trailing content"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			event, err := decodeEventLine([]byte(tt.line))
+			if tt.wantErr {
+				if err == nil {
+					t.Fatal("decodeEventLine() error = nil, want rejection")
+				}
+				if !strings.Contains(err.Error(), tt.errContains) {
+					t.Fatalf("decodeEventLine() error = %q, want substring %q", err, tt.errContains)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("decodeEventLine() error = %v", err)
+			}
+			if event.Type != reporter.EventTypeMessage || event.Message != "ready" {
+				t.Errorf("decodeEventLine() event = %+v, want message event", event)
+			}
+		})
+	}
 }
 
 func validEventType(et reporter.EventType) bool {
