@@ -1,4 +1,4 @@
-.PHONY: all clean fmt lint test test-cover tidy check bump help
+.PHONY: all clean fmt lint vet test test-cover tidy check bump help
 
 # Go commands
 GO := go
@@ -8,6 +8,12 @@ GOFMT := gofmt
 # binary differs. Bump it in a dedicated commit.
 GOLANGCI_LINT_VERSION := 2.12.2
 GOFILES := $(shell find . -type f -name '*.go' -not -path "./vendor/*")
+# The _examples/ programs, enumerated at run time by scripts/example-dirs.sh.
+# Go package patterns ignore directories starting with "_", so `./...` never
+# reaches them and the analyzers must be given the directories explicitly.
+# The CI Lint and Verify jobs run the same script, so adding
+# _examples/<program>/ is covered here and in CI without editing either file.
+EXAMPLE_DIRS_CMD := ./scripts/example-dirs.sh
 
 all: fmt lint test
 
@@ -15,17 +21,26 @@ all: fmt lint test
 fmt:
 	$(GOFMT) -w $(GOFILES)
 
-## lint: Run linter (skips if not installed; warns if the installed version differs from GOLANGCI_LINT_VERSION)
+## lint: Run linter over the module and the _examples/ programs (skips if not installed; warns if the installed version differs from GOLANGCI_LINT_VERSION)
 lint:
 	@if command -v golangci-lint >/dev/null 2>&1; then \
 		installed="$$(golangci-lint version --short 2>/dev/null)"; \
 		if [ -n "$$installed" ] && [ "$$installed" != "$(GOLANGCI_LINT_VERSION)" ]; then \
 			echo "warning: golangci-lint $$installed installed, CI pins $(GOLANGCI_LINT_VERSION); results may differ"; \
 		fi; \
-		golangci-lint run; \
+		golangci-lint run || exit 1; \
+		dirs="$$($(EXAMPLE_DIRS_CMD))" || exit 1; \
+		golangci-lint run $$dirs || exit 1; \
 	else \
 		echo "golangci-lint not installed, skipping"; \
 	fi
+
+## vet: Run go vet over the module and the _examples/ programs
+vet:
+	$(GO) vet ./...
+	@dirs="$$($(EXAMPLE_DIRS_CMD))" || exit 1; \
+		echo "$(GO) vet $$dirs" | tr '\n' ' '; echo; \
+		$(GO) vet $$dirs || exit 1
 
 ## test: Run tests
 test:
@@ -45,8 +60,8 @@ clean:
 	rm -f coverage.out coverage.html
 	$(GO) clean
 
-## check: Run fmt, lint, and test
-check: fmt lint test
+## check: Run fmt, lint, vet, and test
+check: fmt lint vet test
 
 ## bump: Tag and push next version (requires clean tree and svu)
 bump:
