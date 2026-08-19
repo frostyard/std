@@ -1,4 +1,4 @@
-.PHONY: all clean fmt lint vet test test-cover tidy check bump help
+.PHONY: all clean fmt lint vet test test-cover coverage-check test-coverage-check tidy check bump help
 
 # Go commands
 GO := go
@@ -42,14 +42,22 @@ vet:
 		echo "$(GO) vet $$dirs" | tr '\n' ' '; echo; \
 		$(GO) vet $$dirs || exit 1
 
-## test: Run tests
+## test: Run tests (writes coverage.out for the reporter package across every test package)
 test:
-	$(GO) test -v ./...
+	$(GO) test -v -coverprofile=coverage.out -covermode=atomic -coverpkg=github.com/frostyard/std/reporter ./...
 
-## test-cover: Run tests with coverage
+## test-cover: Run tests with coverage (writes coverage.out plus an HTML report)
 test-cover:
-	$(GO) test -coverprofile=coverage.out ./...
+	$(GO) test -coverprofile=coverage.out -covermode=atomic -coverpkg=github.com/frostyard/std/reporter ./...
 	$(GO) tool cover -html=coverage.out -o coverage.html
+
+## coverage-check: Enforce the 95.0% total statement-coverage floor on coverage.out (scripts/check-coverage.sh)
+coverage-check:
+	./scripts/check-coverage.sh
+
+## test-coverage-check: Self-test scripts/check-coverage.sh against fixture profiles
+test-coverage-check:
+	./scripts/test-coverage-check.sh
 
 ## tidy: Tidy go modules
 tidy:
@@ -60,8 +68,8 @@ clean:
 	rm -f coverage.out coverage.html
 	$(GO) clean
 
-## check: Run fmt, lint, vet, and test
-check: fmt lint vet test
+## check: Run fmt, lint, vet, test, and the coverage floor
+check: fmt lint vet test test-coverage-check coverage-check
 
 ## bump: Tag and push next version (requires clean tree and svu)
 bump:

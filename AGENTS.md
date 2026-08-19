@@ -58,11 +58,13 @@ whichever agent you are:
 ### Commands
 
 ```bash
-make check           # fmt + lint + vet + test — the local gate; run before every PR
-make test            # go test -v ./... (unit tests + tests/e2e)
+make check           # fmt + lint + vet + test + coverage floor — the local gate; run before every PR
+make test            # go test -v ./... with a coverage profile (unit tests + tests/e2e)
 make lint            # golangci-lint run (.golangci.yml), module + _examples/
 make vet             # go vet, module + _examples/
 make test-cover      # coverage profile + HTML report
+make coverage-check  # enforce the 95.0% total statement-coverage floor on coverage.out
+make test-coverage-check  # self-test scripts/check-coverage.sh with fixture profiles
 make bump            # tag next semver with svu and push the tag (see Releases)
 go test -v -run TestName ./reporter/   # run a single unit test
 go test -v ./tests/e2e/...             # the example-program e2e suite alone
@@ -150,7 +152,11 @@ of golangci-lint from the `Makefile`, with `.golangci.yml`, over the module
 and the `_examples/` programs), **Security Scan** (`govulncheck ./...` with
 `golang.org/x/vuln/cmd/govulncheck@v1.6.0` pinned — reachable Go
 standard-library advisories, since the module has no dependencies), **Unit
-Tests** (`go test -v ./...`),
+Tests** (`go test -v ./...` with a coverage profile, then the 95.0% total
+statement-coverage floor via `make coverage-check`
+([`scripts/check-coverage.sh`](scripts/check-coverage.sh)) after
+`make test-coverage-check` self-tests it; the profile is uploaded as the
+`coverage-profile` artifact),
 **Race Detection** (`go test -race -short ./...`), **Verify** (`go mod tidy`
 leaves no diff, `go vet` over the module and the `_examples/` programs,
 `gofmt -l` empty), **Docs integrity** (`node

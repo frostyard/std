@@ -50,9 +50,20 @@ PR template ──► review rubric ──► CI gates ──► corrections ─
     `golang.org/x/vuln/cmd/govulncheck@v1.6.0` pinned (the same job clix and
     updex run): with no dependencies the signal is a reachable Go
     standard-library advisory, which every consumer of `reporter` inherits.
-  - *Unit Tests* — `go test -v ./...`: `reporter/` unit tests plus the
-    [e2e suite](../../tests/e2e/README.md), which builds and runs every
-    `_examples/*` program in every output mode.
+  - *Unit Tests* — `go test -v -coverprofile=coverage.out -covermode=atomic
+    -coverpkg=github.com/frostyard/std/reporter ./...`: `reporter/` unit tests
+    plus the [e2e suite](../../tests/e2e/README.md), which builds and runs
+    every `_examples/*` program in every output mode. `-coverpkg` attributes
+    coverage to `reporter/` whichever test package exercised it, so the e2e
+    runs count. The job then enforces a **95.0% total statement-coverage
+    floor** with [`scripts/check-coverage.sh`](../../scripts/check-coverage.sh)
+    (`make coverage-check`, ported from frostyard/clix and updex), after
+    self-testing that script against fixture profiles (`make
+    test-coverage-check`) so a broken checker cannot silently pass a
+    regression. The profile is uploaded as the `coverage-profile` artifact.
+    Observed coverage is 97.7%. The floor may tighten, never loosen; there is
+    no coverage service, and `make test-cover` still produces a local
+    `coverage.html`.
   - *Race Detection* — `go test -race -short ./...`.
   - *Verify* — `go mod tidy` leaves no diff (the stdlib-only constraint is
     visible here: `go.mod` never gains a `require`), `go vet ./...` plus a
