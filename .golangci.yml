@@ -1,8 +1,10 @@
 version: "2"
 
-# Code style configuration for golangci-lint (v2 schema). `make lint` runs
-# `golangci-lint run`, which picks this file up; CI's Lint job runs the same
-# binary against the same file so local and CI findings agree.
+# Code style configuration for golangci-lint (v2 schema). `make lint` and the
+# CI Lint job (golangci-lint-action) both run `golangci-lint run`, which reads
+# this file. The linter release itself is pinned as GOLANGCI_LINT_VERSION in
+# the Makefile — the CI job installs exactly that version and `make lint`
+# warns when the local binary differs — so local and CI findings agree.
 
 linters:
   # The standard set: errcheck, govet, ineffassign, staticcheck, unused.

@@ -47,9 +47,11 @@ whichever agent you are:
   `go.mod` names)
 - `make`
 - [`golangci-lint`](https://golangci-lint.run/) v2 for `make lint`
-  (configured by [`.golangci.yml`](.golangci.yml); the Makefile prints a
-  skip notice when it is absent and fails on findings when it is present,
-  CI always runs it)
+  (configured by [`.golangci.yml`](.golangci.yml); the release CI installs is
+  pinned as `GOLANGCI_LINT_VERSION` in the `Makefile`, currently 2.12.2 —
+  the Makefile prints a skip notice when the binary is absent, warns when the
+  installed version differs from the pin, and fails on findings when it is
+  present; CI always runs the pinned release)
 - [`svu`](https://github.com/caarlos0/svu) only for `make bump`
 - Node 20+ only for `node scripts/check-docs.mjs` (zero dependencies)
 
@@ -107,9 +109,11 @@ interface; they double as the e2e fixtures.
   fields
 - Formatting is `gofmt` (enforced by `make fmt` and the `gofmt` formatter in
   `.golangci.yml`); linting is golangci-lint's `standard` set —
-  `.golangci.yml` is the single source of what `make lint` and CI run, so a
-  new finding after a linter upgrade is fixed in code, never hidden by
-  loosening the config
+  `.golangci.yml` is the single source of what `make lint` and CI run, and
+  `GOLANGCI_LINT_VERSION` in the `Makefile` is the single source of which
+  golangci-lint release runs it (the CI Lint job reads that variable and
+  `make lint` warns on a mismatch), so a new finding after a deliberate
+  linter bump is fixed in code, never hidden by loosening the config
 - [`.editorconfig`](.editorconfig) carries the editor defaults (tabs in Go
   and Makefiles, two-space YAML/JSON/Markdown, LF, final newline)
 - Error strings are lowercase without trailing punctuation
@@ -134,7 +138,8 @@ interface; they double as the e2e fixtures.
 ## Continuous integration
 
 [`.github/workflows/ci.yml`](.github/workflows/ci.yml) runs on every push to
-`main` and every pull request: **Lint** (golangci-lint with `.golangci.yml`),
+`main` and every pull request: **Lint** (the `GOLANGCI_LINT_VERSION` release
+of golangci-lint from the `Makefile`, with `.golangci.yml`),
 **Unit Tests** (`go test -v ./...`), **Race Detection**
 (`go test -race -short ./...`), **Verify** (`go mod tidy` leaves no diff, `go
 vet`, `gofmt -l` empty), and **Docs integrity** (`node
