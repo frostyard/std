@@ -41,10 +41,12 @@ PR template ──► review rubric ──► CI gates ──► corrections ─
     [`.golangci.yml`](../../.golangci.yml) (`standard` linters, `gofmt`
     formatter); the same file `make lint` uses. The release is pinned as
     `GOLANGCI_LINT_VERSION` in the [`Makefile`](../../Makefile): the CI job
-    installs exactly that version and `make lint` warns when the local
-    binary differs, so a linter release cannot change the gate without a
-    commit. It runs twice: once over the packages `./...` matches, once over
-    the [`_examples/`](#example-programs-are-analyzed-explicitly) program
+    installs exactly that version; locally it is a prerequisite, and `make
+    lint` fails with its pinned `go install` command when the binary is absent
+    and warns when the version differs. A linter release therefore cannot
+    change or disappear from the gate without a failure. It runs twice: once
+    over the packages `./...` matches, once over the
+    [`_examples/`](#example-programs-are-analyzed-explicitly) program
     directories.
   - *Security Scan* — `govulncheck ./...` with
     `golang.org/x/vuln/cmd/govulncheck@v1.7.0` pinned (the same job clix and

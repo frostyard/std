@@ -21,7 +21,7 @@ all: fmt lint test
 fmt:
 	$(GOFMT) -w $(GOFILES)
 
-## lint: Run linter over the module and the _examples/ programs (skips if not installed; warns if the installed version differs from GOLANGCI_LINT_VERSION)
+## lint: Run linter over the module and the _examples/ programs (requires golangci-lint; warns if the installed version differs from GOLANGCI_LINT_VERSION)
 lint:
 	@if command -v golangci-lint >/dev/null 2>&1; then \
 		installed="$$(golangci-lint version --short 2>/dev/null)"; \
@@ -32,7 +32,9 @@ lint:
 		dirs="$$($(EXAMPLE_DIRS_CMD))" || exit 1; \
 		golangci-lint run $$dirs || exit 1; \
 	else \
-		echo "golangci-lint not installed, skipping"; \
+		echo "golangci-lint not installed; install the pinned version:"; \
+		echo "go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v$(GOLANGCI_LINT_VERSION)"; \
+		exit 1; \
 	fi
 
 ## vet: Run go vet over the module and the _examples/ programs

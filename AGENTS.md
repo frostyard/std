@@ -49,9 +49,9 @@ whichever agent you are:
 - [`golangci-lint`](https://golangci-lint.run/) v2 for `make lint`
   (configured by [`.golangci.yml`](.golangci.yml); the release CI installs is
   pinned as `GOLANGCI_LINT_VERSION` in the `Makefile`, currently 2.12.2 —
-  the Makefile prints a skip notice when the binary is absent, warns when the
-  installed version differs from the pin, and fails on findings when it is
-  present; CI always runs the pinned release)
+  the Makefile fails with the pinned `go install` command when the binary is
+  absent, warns when the installed version differs from the pin, and fails on
+  findings; CI always runs the pinned release)
 - [`svu`](https://github.com/caarlos0/svu) only for `make bump`
 - Node 20+ only for `node scripts/check-docs.mjs` (zero dependencies)
 
