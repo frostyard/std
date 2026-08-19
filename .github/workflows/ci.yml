@@ -190,6 +190,7 @@ jobs:
       # distribution as release.yml: 'goreleaser-pro' because .goreleaser.yaml
       # sets `pro: true`, which OSS GoReleaser refuses to validate.
       - name: Validate .goreleaser.yaml
+        if: ${{ secrets.GORELEASER_KEY != '' }}
         uses: goreleaser/goreleaser-action@f06c13b6b1a9625abc9e6e439d9c05a8f2190e94 # v7.2.3
         with:
           distribution: goreleaser-pro
@@ -197,3 +198,7 @@ jobs:
           args: check
         env:
           GORELEASER_KEY: ${{ secrets.GORELEASER_KEY }}
+
+      - name: Skip goreleaser check (missing GORELEASER_KEY)
+        if: ${{ secrets.GORELEASER_KEY == '' }}
+        run: echo "GORELEASER_KEY unavailable for this run; skipping goreleaser check."
