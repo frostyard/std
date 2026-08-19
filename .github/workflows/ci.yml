@@ -175,6 +175,12 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
+    # The `secrets` context is not available in a step-level `if:` — only
+    # `env` is — so the key is mapped to a job-level env var and the guards
+    # below test that instead. Using `secrets.*` in `if:` is what made this
+    # workflow file invalid.
+    env:
+      GORELEASER_KEY: ${{ secrets.GORELEASER_KEY }}
     steps:
       - name: Checkout code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -190,15 +196,13 @@ jobs:
       # distribution as release.yml: 'goreleaser-pro' because .goreleaser.yaml
       # sets `pro: true`, which OSS GoReleaser refuses to validate.
       - name: Validate .goreleaser.yaml
-        if: ${{ secrets.GORELEASER_KEY != '' }}
+        if: env.GORELEASER_KEY != ''
         uses: goreleaser/goreleaser-action@f06c13b6b1a9625abc9e6e439d9c05a8f2190e94 # v7.2.3
         with:
           distribution: goreleaser-pro
           version: "~> v2"
           args: check
-        env:
-          GORELEASER_KEY: ${{ secrets.GORELEASER_KEY }}
 
       - name: Skip goreleaser check (missing GORELEASER_KEY)
-        if: ${{ secrets.GORELEASER_KEY == '' }}
+        if: env.GORELEASER_KEY == ''
         run: echo "GORELEASER_KEY unavailable for this run; skipping goreleaser check."
