@@ -39,7 +39,11 @@ PR template ──► review rubric ──► CI gates ──► corrections ─
   permissions:
   - *Lint* — golangci-lint v2 configured by
     [`.golangci.yml`](../../.golangci.yml) (`standard` linters, `gofmt`
-    formatter); the same file `make lint` uses.
+    formatter); the same file `make lint` uses. The release is pinned as
+    `GOLANGCI_LINT_VERSION` in the [`Makefile`](../../Makefile): the CI job
+    installs exactly that version and `make lint` warns when the local
+    binary differs, so a linter release cannot change the gate without a
+    commit.
   - *Unit Tests* — `go test -v ./...`: `reporter/` unit tests plus the
     [e2e suite](../../tests/e2e/README.md), which builds and runs every
     `_examples/*` program in every output mode.
