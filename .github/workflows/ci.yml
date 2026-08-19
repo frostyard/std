@@ -169,3 +169,31 @@ jobs:
 
       - name: Check docs index, links, and conformance aliases
         run: node scripts/check-docs.mjs
+
+  release-config:
+    name: Release config
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+
+      # `goreleaser check` validates .goreleaser.yaml so a broken release
+      # config fails here instead of after an immutable tag is pushed and
+      # release.yml is the first thing to read it. Same action SHA and
+      # distribution as release.yml: 'goreleaser-pro' because .goreleaser.yaml
+      # sets `pro: true`, which OSS GoReleaser refuses to validate.
+      - name: Validate .goreleaser.yaml
+        uses: goreleaser/goreleaser-action@f06c13b6b1a9625abc9e6e439d9c05a8f2190e94 # v7.2.3
+        with:
+          distribution: goreleaser-pro
+          version: "~> v2"
+          args: check
+        env:
+          GORELEASER_KEY: ${{ secrets.GORELEASER_KEY }}

@@ -153,11 +153,16 @@ standard-library advisories, since the module has no dependencies), **Unit
 Tests** (`go test -v ./...`),
 **Race Detection** (`go test -race -short ./...`), **Verify** (`go mod tidy`
 leaves no diff, `go vet` over the module and the `_examples/` programs,
-`gofmt -l` empty), and **Docs integrity** (`node
+`gofmt -l` empty), **Docs integrity** (`node
 scripts/check-docs.mjs` — every doc indexed in `docs/README.md`, every
 relative link resolving, every symlink alias intact, thresholds in
 [`.coverage-thresholds.json`](.coverage-thresholds.json), all `1.0`,
-`never_relax: true`). Actions are pinned by commit SHA with least-privilege
+`never_relax: true`), and **Release config** (`goreleaser check` over
+[`.goreleaser.yaml`](.goreleaser.yaml), so a broken release configuration
+fails pre-merge instead of after an immutable tag is pushed; it runs the
+GoReleaser Pro distribution at the same action SHA `release.yml` uses,
+because the config sets `pro: true`, and needs the org secret
+`GORELEASER_KEY`). Actions are pinned by commit SHA with least-privilege
 permissions (core ADR-0021). `make check` reproduces the Go half locally.
 
 ## Releases
