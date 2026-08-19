@@ -58,9 +58,10 @@ whichever agent you are:
 ### Commands
 
 ```bash
-make check           # fmt + lint + test — the local gate; run before every PR
+make check           # fmt + lint + vet + test — the local gate; run before every PR
 make test            # go test -v ./... (unit tests + tests/e2e)
-make lint            # golangci-lint run (.golangci.yml)
+make lint            # golangci-lint run (.golangci.yml), module + _examples/
+make vet             # go vet, module + _examples/
 make test-cover      # coverage profile + HTML report
 make bump            # tag next semver with svu and push the tag (see Releases)
 go test -v -run TestName ./reporter/   # run a single unit test
@@ -72,7 +73,13 @@ node scripts/check-docs.mjs            # docs-integrity gate (index, links, alia
 result. `go test ./...` deliberately excludes `_examples/` (underscore
 directories are invisible to package patterns); the e2e suite in
 [tests/e2e/](tests/e2e/README.md) builds and runs those programs so they
-cannot rot.
+cannot rot. The same blind spot applies to the analyzers, so `make lint`,
+`make vet`, and the CI Lint and Verify jobs each run a second pass over the
+example package directories named explicitly;
+[`scripts/example-dirs.sh`](scripts/example-dirs.sh) enumerates them (and
+fails when the list is empty), so adding `_examples/<program>/` needs no
+change to the `Makefile` or to `ci.yml` — see
+[docs/design/quality-loop.md](docs/design/quality-loop.md).
 
 ## Architecture
 
@@ -139,10 +146,11 @@ interface; they double as the e2e fixtures.
 
 [`.github/workflows/ci.yml`](.github/workflows/ci.yml) runs on every push to
 `main` and every pull request: **Lint** (the `GOLANGCI_LINT_VERSION` release
-of golangci-lint from the `Makefile`, with `.golangci.yml`),
-**Unit Tests** (`go test -v ./...`), **Race Detection**
-(`go test -race -short ./...`), **Verify** (`go mod tidy` leaves no diff, `go
-vet`, `gofmt -l` empty), and **Docs integrity** (`node
+of golangci-lint from the `Makefile`, with `.golangci.yml`, over the module
+and the `_examples/` programs), **Unit Tests** (`go test -v ./...`),
+**Race Detection** (`go test -race -short ./...`), **Verify** (`go mod tidy`
+leaves no diff, `go vet` over the module and the `_examples/` programs,
+`gofmt -l` empty), and **Docs integrity** (`node
 scripts/check-docs.mjs` — every doc indexed in `docs/README.md`, every
 relative link resolving, every symlink alias intact, thresholds in
 [`.coverage-thresholds.json`](.coverage-thresholds.json), all `1.0`,

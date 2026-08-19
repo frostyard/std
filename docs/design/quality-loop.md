@@ -43,20 +43,42 @@ PR template ──► review rubric ──► CI gates ──► corrections ─
     `GOLANGCI_LINT_VERSION` in the [`Makefile`](../../Makefile): the CI job
     installs exactly that version and `make lint` warns when the local
     binary differs, so a linter release cannot change the gate without a
-    commit.
+    commit. It runs twice: once over the packages `./...` matches, once over
+    the [`_examples/`](#example-programs-are-analyzed-explicitly) program
+    directories.
   - *Unit Tests* — `go test -v ./...`: `reporter/` unit tests plus the
     [e2e suite](../../tests/e2e/README.md), which builds and runs every
     `_examples/*` program in every output mode.
   - *Race Detection* — `go test -race -short ./...`.
   - *Verify* — `go mod tidy` leaves no diff (the stdlib-only constraint is
-    visible here: `go.mod` never gains a `require`), `go vet ./...`,
-    `gofmt -l .` empty.
+    visible here: `go.mod` never gains a `require`), `go vet ./...` plus a
+    second `go vet` over the
+    [`_examples/`](#example-programs-are-analyzed-explicitly) program
+    directories, `gofmt -l .` empty.
   - *Docs integrity* (`docs-gate`): `node scripts/check-docs.mjs` checks
     docs-index coverage, relative-link integrity, symlink resolution, and the
     metric's pinned headings against
     [.coverage-thresholds.json](../../.coverage-thresholds.json) — all 1.0,
     `never_relax: true` (the loop may tighten, never loosen).
-  - `make check` (fmt → lint → test) reproduces the Go half locally.
+  - `make check` (fmt → lint → vet → test) reproduces the Go half locally,
+    including both passes over the example programs.
+
+### Example programs are analyzed explicitly
+
+Go package patterns ignore directories whose name begins with `_`, so
+neither `./...` nor `./_examples/...` matches the
+[`_examples/`](../../tests/e2e/README.md) programs — before this coverage
+existed, `go vet ./...` and `golangci-lint run` reported them clean because
+they never looked at them. The analyzers therefore receive the example
+package directories by name. [`scripts/example-dirs.sh`](../../scripts/example-dirs.sh)
+enumerates them at run time (every `_examples/*/` directory holding at least
+one `.go` file) and exits non-zero when the list is empty, so a silent
+regression to analyzing nothing fails the gate. Both the CI Lint and Verify
+jobs and the `lint` and `vet` Makefile targets call that one script, which is
+what keeps the [`.golangci.yml`](../../.golangci.yml) promise that local and
+CI findings agree, and means a new `_examples/<program>/` is analyzed without
+editing [ci.yml](../../.github/workflows/ci.yml) or the
+[`Makefile`](../../Makefile).
 - **Learn** — corrections land in
   [.memory/corrections.jsonl](../../.memory/README.md) (append-only,
   five-field schema) and are promoted into `AGENTS.md`, docs, or skills;

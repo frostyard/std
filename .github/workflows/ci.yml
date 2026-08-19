@@ -46,6 +46,17 @@ jobs:
         with:
           version: ${{ steps.lint-version.outputs.version }}
 
+      # The step above lints the packages `./...` matches, which never
+      # includes _examples/: Go package patterns ignore directories starting
+      # with "_". Name those package directories explicitly, using the same
+      # enumeration `make lint` uses so a new _examples/<program>/ is covered
+      # without editing this workflow. The action installs the pinned release
+      # and puts it on PATH, so this runs the same binary and .golangci.yml.
+      - name: golangci-lint on the _examples programs
+        run: |
+          dirs="$(./scripts/example-dirs.sh)"
+          golangci-lint run $dirs
+
   test:
     name: Unit Tests
     runs-on: ubuntu-latest
@@ -105,6 +116,16 @@ jobs:
 
       - name: Run go vet
         run: go vet ./...
+
+      # `./...` above skips _examples/ — Go package patterns ignore
+      # directories starting with "_" — so the example programs need their
+      # package directories named explicitly. The list is enumerated at run
+      # time (and the script fails when it is empty), so a new
+      # _examples/<program>/ is vetted without editing this workflow.
+      - name: Run go vet over the _examples programs
+        run: |
+          dirs="$(./scripts/example-dirs.sh)"
+          go vet $dirs
 
       - name: Check formatting
         run: |
