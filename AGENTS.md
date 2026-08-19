@@ -150,7 +150,7 @@ interface; they double as the e2e fixtures.
 `main` and every pull request: **Lint** (the `GOLANGCI_LINT_VERSION` release
 of golangci-lint from the `Makefile`, with `.golangci.yml`, over the module
 and the `_examples/` programs), **Security Scan** (`govulncheck ./...` with
-`golang.org/x/vuln/cmd/govulncheck@v1.6.0` pinned — reachable Go
+`golang.org/x/vuln/cmd/govulncheck@v1.7.0` pinned — reachable Go
 standard-library advisories, since the module has no dependencies), **Unit
 Tests** (`go test -v ./...` with a coverage profile, then the 95.0% total
 statement-coverage floor via `make coverage-check`
