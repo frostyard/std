@@ -121,7 +121,7 @@ Examples use a `-format` command-line flag to select between `text`, `json`, and
 ## Build & Test
 
 ```bash
-make check           # Pre-commit gate: fmt + lint + test
+make check           # Pre-commit: fmt + lint + vet + test + coverage self-test + 95% floor
 make test            # Run all tests (unit + tests/e2e)
 make lint            # Run golangci-lint (.golangci.yml)
 make test-cover      # Tests with coverage + HTML report
