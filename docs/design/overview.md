@@ -130,7 +130,8 @@ node scripts/check-docs.mjs   # Docs-integrity gate
 ```
 
 CI (`.github/workflows/ci.yml`) runs Lint, Unit Tests, Race Detection,
-Verify (tidy/vet/gofmt), and Docs integrity on every PR and push to `main`;
+Verify (tidy/vet/gofmt), and Docs integrity on every PR, every push to
+`main`, and every merge-queue branch (`merge_group`);
 the loop around it — template, rubric, gates, corrections, metric, release
 path — is described in [quality-loop.md](quality-loop.md).
 
