@@ -97,9 +97,28 @@ jobs:
         with:
           go-version-file: go.mod
 
-      # Unit tests plus tests/e2e, which builds and runs the _examples/ programs.
-      - name: Run tests
-        run: go test -v ./...
+      # Unit tests plus tests/e2e, which builds and runs the _examples/
+      # programs. -coverpkg attributes coverage to the reporter package no
+      # matter which test package exercised it, so the e2e suite's runs of
+      # the example programs count toward the floor below.
+      - name: Run tests with coverage
+        run: go test -v -coverprofile=coverage.out -covermode=atomic -coverpkg=github.com/frostyard/std/reporter ./...
+
+      # The floor cannot be lowered without a commit: scripts/check-coverage.sh
+      # defaults to 95.0 and the self-test pins the script's own behaviour, so
+      # a broken checker cannot silently pass a regression.
+      - name: Self-test the coverage floor script
+        run: make test-coverage-check
+
+      - name: Enforce coverage floor
+        run: make coverage-check
+
+      - name: Upload coverage profile
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: coverage-profile
+          path: coverage.out
+          if-no-files-found: error
 
   race:
     name: Race Detection
