@@ -43,7 +43,7 @@ whichever agent you are:
 
 ### Prerequisites
 
-- **Go 1.26.6 or newer** (`go.mod` targets `go 1.26.6`; CI uses the version
+- **Go 1.26.7 or newer** (`go.mod` targets `go 1.26.7`; CI uses the version
   `go.mod` names)
 - `make`
 - [`golangci-lint`](https://golangci-lint.run/) v2 for `make lint`
