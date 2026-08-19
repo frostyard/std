@@ -7,6 +7,14 @@ package reporter
 //   - TextReporter: human-readable text output
 //   - JSONReporter: machine-readable JSON Lines output
 //   - NoopReporter: silently discards all output
+//
+// Message, MessagePlain, and Warning take fmt.Sprintf-style format strings.
+// go vet's printf analyzer checks those calls only through the concrete
+// types (*TextReporter, *JSONReporter); calls made through the Reporter
+// interface are not statically checked, so a wrong verb or a missing
+// argument surfaces at runtime as %!v(...) or %!s(MISSING) in the output.
+// Keep format strings literal and covered by tests, or call through the
+// concrete type where a test can pin the output.
 type Reporter interface {
 	Step(step, total int, name string)
 	Progress(percent int, message string)

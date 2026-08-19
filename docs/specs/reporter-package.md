@@ -38,6 +38,17 @@ type Reporter interface {
 | `Complete` | Signal completion with a summary message and optional structured `details` |
 | `IsJSON` | Runtime discriminator — `true` only for JSONReporter |
 
+### Static checking
+
+`Message`, `MessagePlain`, and `Warning` take `fmt.Sprintf`-style format
+strings. `go vet`'s printf analyzer checks those calls only through the
+concrete types (`*TextReporter`, `*JSONReporter`); calls made through the
+`Reporter` interface are not statically checked, so a wrong verb or a missing
+argument surfaces at runtime as `%!v(...)` or `%!s(MISSING)` in the output
+(text and JSON `message` fields alike). Consumers: keep format strings literal
+and covered by tests, or call through the concrete type where a test can pin
+the output.
+
 ## ProgressEvent (JSON serialization type)
 
 Defined in `reporter/event.go`. This is the struct that `JSONReporter` encodes as JSON Lines:
