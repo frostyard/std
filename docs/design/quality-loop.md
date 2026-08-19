@@ -47,7 +47,7 @@ PR template ──► review rubric ──► CI gates ──► corrections ─
     the [`_examples/`](#example-programs-are-analyzed-explicitly) program
     directories.
   - *Security Scan* — `govulncheck ./...` with
-    `golang.org/x/vuln/cmd/govulncheck@v1.6.0` pinned (the same job clix and
+    `golang.org/x/vuln/cmd/govulncheck@v1.7.0` pinned (the same job clix and
     updex run): with no dependencies the signal is a reachable Go
     standard-library advisory, which every consumer of `reporter` inherits.
   - *Unit Tests* — `go test -v -coverprofile=coverage.out -covermode=atomic
