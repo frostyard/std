@@ -3,8 +3,36 @@ package reporter
 import (
 	"bytes"
 	"errors"
+	"io"
 	"testing"
 )
+
+func TestTextReporter_NilWriter(t *testing.T) {
+	r := NewTextReporter(nil)
+	if r.w != io.Discard {
+		t.Fatalf("NewTextReporter(nil) writer = %T, want io.Discard", r.w)
+	}
+
+	tests := []struct {
+		name string
+		call func()
+	}{
+		{"first step", func() { r.Step(1, 2, "first") }},
+		{"repeated step", func() { r.Step(2, 2, "second") }},
+		{"progress", func() { r.Progress(50, "halfway") }},
+		{"message", func() { r.Message("item %d", 1) }},
+		{"plain message", func() { r.MessagePlain("item %d", 2) }},
+		{"warning", func() { r.Warning("item %d", 3) }},
+		{"error", func() { r.Error(errors.New("failed"), "item") }},
+		{"complete", func() { r.Complete("done", map[string]bool{"ok": true}) }},
+		{"repeated complete", func() { r.Complete("still done", nil) }},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tt.call()
+		})
+	}
+}
 
 func TestTextReporter_Step(t *testing.T) {
 	var buf bytes.Buffer
