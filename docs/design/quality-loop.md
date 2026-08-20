@@ -77,13 +77,14 @@ PR template ──► review rubric ──► CI gates ──► corrections ─
     metric's pinned headings against
     [.coverage-thresholds.json](../../.coverage-thresholds.json) — all 1.0,
     `never_relax: true` (the loop may tighten, never loosen).
-  - *Release config* (`release-config`): `goreleaser check` validates
-    [`.goreleaser.yaml`](../../.goreleaser.yaml) on every pull request, so a
-    broken release configuration fails pre-merge instead of after an
-    immutable tag is pushed. It runs the GoReleaser Pro distribution at the
-    same action SHA `release.yml` uses, because the config sets `pro: true`
-    and OSS GoReleaser refuses to validate Pro fields; it needs the org
-    secret `GORELEASER_KEY`.
+  - *Release config* (`release-config`): the job reports on every trigger, but
+    `goreleaser check` validates
+    [`.goreleaser.yaml`](../../.goreleaser.yaml) only when
+    `GORELEASER_KEY` is available. That guarded action runs the GoReleaser Pro
+    distribution at the same action SHA `release.yml` uses because the config
+    sets `pro: true` and OSS GoReleaser refuses to validate Pro fields. Without
+    the key, the complementary guard emits `GORELEASER_KEY unavailable for this
+    run; skipping goreleaser check.` and the job succeeds without validation.
   - `make check` (fmt → lint → vet → test) reproduces the Go half locally,
     including both passes over the example programs.
 
@@ -129,10 +130,11 @@ GoReleaser Pro run of [`.goreleaser.yaml`](../../.goreleaser.yaml) that skips
 builds and publishes a changelog-only GitHub release. Both files are a
 review-required boundary; agents never tag or release.
 
-A tag is immutable, so `release.yml` must never be the first thing to read
-`.goreleaser.yaml`. The *Release config* gate job runs `goreleaser check`
-against it on every pull request, moving a config error from after the tag to
-before the merge.
+A tag is immutable, so trusted runs with `GORELEASER_KEY` use the *Release
+config* gate to move a `.goreleaser.yaml` error from after the tag to before
+the merge. Secretless runs do not validate `.goreleaser.yaml`; they still
+report the stable job context through the explicit skip step, so maintainers
+must rely on a trusted validation run before tagging.
 
 ## Operational notes
 
