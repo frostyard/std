@@ -44,7 +44,7 @@ vet:
 		echo "$(GO) vet $$dirs" | tr '\n' ' '; echo; \
 		$(GO) vet $$dirs || exit 1
 
-## test: Run tests (writes coverage.out for the reporter package across every test package)
+## test: Run tests, assert instrumented example-subprocess reporter coverage, and write the in-process reporter profile to coverage.out
 test:
 	$(GO) test -v -coverprofile=coverage.out -covermode=atomic -coverpkg=github.com/frostyard/std/reporter ./...
 

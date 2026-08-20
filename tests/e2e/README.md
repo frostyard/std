@@ -4,8 +4,8 @@ std is a library and ships no binary, so its end-to-end surface is the set of
 runnable programs under [`_examples/`](../../_examples/) (`deploy`,
 `fileprocess`, `healthcheck`, `migration`), each of which drives the whole
 `reporter.Reporter` interface behind a `-format text|json|noop` flag. The
-suite in [`examples_test.go`](examples_test.go) builds every example and runs
-it as a real subprocess:
+suite in [`examples_test.go`](examples_test.go) builds every example with Go
+coverage instrumentation and runs it as a real subprocess:
 
 - `-format json` — exit 0, nothing on stderr, every stdout line decodes into
   `reporter.ProgressEvent` with unknown fields rejected, every `type` is a
@@ -17,6 +17,14 @@ it as a real subprocess:
   an example may still print its own human-only tip because `IsJSON()` is
   false);
 - `-format bogus` — exit 1 with an "unknown format" message on stderr.
+
+Every execution receives a project-local, test-temporary `GOCOVERDIR`. After
+all modes finish, the suite runs `go tool covdata percent` and fails unless
+the subprocess counters report covered
+`github.com/frostyard/std/reporter` statements. A focused empty-directory
+regression test proves that removing the executions or their `GOCOVERDIR`
+wiring cannot leave this signal green. This covdata signal is separate from
+the in-process `coverage.out` profile and its 95% floor.
 
 `go test ./...` skips underscore directories, so without this suite nothing
 compiled the examples. Run it with:

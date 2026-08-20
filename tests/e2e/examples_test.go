@@ -2,9 +2,12 @@
 // no binary, so the closest thing it has to a program under test is the set of
 // runnable examples in _examples/: each is built and run as a real subprocess
 // in every output mode, and its JSON Lines stream is decoded with the
-// reporter package's own ProgressEvent type. `go test ./...` skips _examples/
-// (underscore directories are invisible to package patterns), so without this
-// suite the examples could rot unnoticed.
+// reporter package's own ProgressEvent type. The binaries carry Go coverage
+// instrumentation and write subprocess counters into a project-local
+// directory; the suite fails unless those counters show reporter statements
+// executed. `go test ./...` skips _examples/ (underscore directories are
+// invisible to package patterns), so without this suite the examples could
+// rot unnoticed.
 package e2e
 
 import (
@@ -18,12 +21,15 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/frostyard/std/reporter"
 )
+
+const reporterImportPath = "github.com/frostyard/std/reporter"
 
 // moduleRoot returns the repository root (two levels above this file).
 func moduleRoot(t *testing.T) string {
@@ -37,6 +43,23 @@ func moduleRoot(t *testing.T) string {
 		t.Fatal(err)
 	}
 	return root
+}
+
+// projectTempDir creates test scratch space below tests/e2e instead of the
+// system temporary directory. Subprocess coverage must remain inside the
+// checkout so the harness never depends on host-global /tmp state.
+func projectTempDir(t *testing.T, root, pattern string) string {
+	t.Helper()
+	dir, err := os.MkdirTemp(filepath.Join(root, "tests", "e2e"), pattern)
+	if err != nil {
+		t.Fatalf("create project-local test directory: %v", err)
+	}
+	t.Cleanup(func() {
+		if err := os.RemoveAll(dir); err != nil {
+			t.Errorf("remove project-local test directory %s: %v", dir, err)
+		}
+	})
+	return dir
 }
 
 // exampleNames lists every runnable program under _examples/.
@@ -62,7 +85,15 @@ func exampleNames(t *testing.T, root string) []string {
 func buildExample(t *testing.T, root, dir, name string) string {
 	t.Helper()
 	bin := filepath.Join(dir, name)
-	cmd := exec.Command("go", "build", "-o", bin, "./_examples/"+name)
+	exampleImportPath := "github.com/frostyard/std/_examples/" + name
+	cmd := exec.Command(
+		"go", "build",
+		"-cover",
+		"-covermode=atomic",
+		"-coverpkg="+reporterImportPath+","+exampleImportPath,
+		"-o", bin,
+		"./_examples/"+name,
+	)
 	cmd.Dir = root
 	if out, err := cmd.CombinedOutput(); err != nil {
 		t.Fatalf("go build ./_examples/%s: %v\n%s", name, err, out)
@@ -71,9 +102,10 @@ func buildExample(t *testing.T, root, dir, name string) string {
 }
 
 // run executes bin with args and returns stdout, stderr, and the exit code.
-func run(t *testing.T, bin string, args ...string) (stdout, stderr string, code int) {
+func run(t *testing.T, bin, coverageDir string, args ...string) (stdout, stderr string, code int) {
 	t.Helper()
 	cmd := exec.Command(bin, args...)
+	cmd.Env = append(os.Environ(), "GOCOVERDIR="+coverageDir)
 	var outBuf, errBuf bytes.Buffer
 	cmd.Stdout = &outBuf
 	cmd.Stderr = &errBuf
@@ -92,7 +124,16 @@ func run(t *testing.T, bin string, args ...string) (stdout, stderr string, code 
 func TestExamples(t *testing.T) {
 	root := moduleRoot(t)
 	names := exampleNames(t, root)
-	binDir := t.TempDir()
+	binDir := projectTempDir(t, root, ".binaries-*")
+	coverageDir := projectTempDir(t, root, ".coverage-*")
+	t.Cleanup(func() {
+		percent, err := reporterCoveragePercent(root, coverageDir)
+		if err != nil {
+			t.Errorf("verify instrumented example coverage: %v", err)
+			return
+		}
+		t.Logf("instrumented example subprocess reporter coverage: %.1f%%", percent)
+	})
 
 	for _, name := range names {
 		t.Run(name, func(t *testing.T) {
@@ -101,7 +142,7 @@ func TestExamples(t *testing.T) {
 
 			t.Run("json", func(t *testing.T) {
 				t.Parallel()
-				stdout, stderr, code := run(t, bin, "-format", "json")
+				stdout, stderr, code := run(t, bin, coverageDir, "-format", "json")
 				if code != 0 {
 					t.Fatalf("exit %d, stderr: %s", code, stderr)
 				}
@@ -127,7 +168,7 @@ func TestExamples(t *testing.T) {
 
 			t.Run("text", func(t *testing.T) {
 				t.Parallel()
-				stdout, stderr, code := run(t, bin, "-format", "text")
+				stdout, stderr, code := run(t, bin, coverageDir, "-format", "text")
 				if code != 0 {
 					t.Fatalf("exit %d, stderr: %s", code, stderr)
 				}
@@ -142,7 +183,7 @@ func TestExamples(t *testing.T) {
 
 			t.Run("noop", func(t *testing.T) {
 				t.Parallel()
-				stdout, stderr, code := run(t, bin, "-format", "noop")
+				stdout, stderr, code := run(t, bin, coverageDir, "-format", "noop")
 				if code != 0 {
 					t.Fatalf("exit %d, stderr: %s", code, stderr)
 				}
@@ -153,7 +194,7 @@ func TestExamples(t *testing.T) {
 				// its own non-reporter text (IsJSON() is false in noop mode, so
 				// human-only tips are allowed), so compare against text mode:
 				// the reporter's contribution must be gone.
-				textOut, _, _ := run(t, bin, "-format", "text")
+				textOut, _, _ := run(t, bin, coverageDir, "-format", "text")
 				if len(stdout) >= len(textOut) {
 					t.Errorf("noop output (%d bytes) is not shorter than text output (%d bytes)", len(stdout), len(textOut))
 				}
@@ -166,7 +207,7 @@ func TestExamples(t *testing.T) {
 
 			t.Run("unknown-format", func(t *testing.T) {
 				t.Parallel()
-				_, stderr, code := run(t, bin, "-format", "bogus")
+				_, stderr, code := run(t, bin, coverageDir, "-format", "bogus")
 				if code != 1 {
 					t.Errorf("exit = %d, want 1", code)
 				}
@@ -175,6 +216,49 @@ func TestExamples(t *testing.T) {
 				}
 			})
 		})
+	}
+}
+
+// reporterCoveragePercent reads the covdata emitted by instrumented example
+// subprocesses. An empty directory, missing GOCOVERDIR wiring, or examples
+// that never execute reporter code all return an error.
+func reporterCoveragePercent(root, coverageDir string) (float64, error) {
+	cmd := exec.Command(
+		"go", "tool", "covdata", "percent",
+		"-i="+coverageDir,
+		"-pkg="+reporterImportPath,
+	)
+	cmd.Dir = root
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return 0, fmt.Errorf("read reporter coverage data: %w: %s", err, strings.TrimSpace(string(output)))
+	}
+	for _, line := range strings.Split(string(output), "\n") {
+		fields := strings.Fields(line)
+		if len(fields) < 3 || fields[0] != reporterImportPath || fields[1] != "coverage:" {
+			continue
+		}
+		percent, err := strconv.ParseFloat(strings.TrimSuffix(fields[2], "%"), 64)
+		if err != nil {
+			return 0, fmt.Errorf("parse reporter coverage percentage %q: %w", fields[2], err)
+		}
+		if percent <= 0 {
+			return 0, fmt.Errorf("reporter coverage is %.1f%%; example subprocesses produced no covered statements", percent)
+		}
+		return percent, nil
+	}
+	return 0, fmt.Errorf("no reporter coverage counters found in %s: %s", coverageDir, strings.TrimSpace(string(output)))
+}
+
+func TestReporterCoveragePercentRejectsEmptyDirectory(t *testing.T) {
+	root := moduleRoot(t)
+	emptyDir := projectTempDir(t, root, ".empty-coverage-*")
+	_, err := reporterCoveragePercent(root, emptyDir)
+	if err == nil {
+		t.Fatal("reporterCoveragePercent() accepted an empty coverage directory")
+	}
+	if !strings.Contains(err.Error(), "no reporter coverage counters") {
+		t.Fatalf("reporterCoveragePercent() error = %q, want missing-counter error", err)
 	}
 }
 

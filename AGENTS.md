@@ -59,7 +59,7 @@ whichever agent you are:
 
 ```bash
 make check           # fmt + lint + vet + test + coverage floor — the local gate; run before every PR
-make test            # go test -v ./... with a coverage profile (unit tests + tests/e2e)
+make test            # unit + e2e; asserts subprocess coverage and writes the in-process coverage profile
 make lint            # golangci-lint run (.golangci.yml), module + _examples/
 make vet             # go vet, module + _examples/
 make test-cover      # coverage profile + HTML report
@@ -74,8 +74,12 @@ node scripts/check-docs.mjs            # docs-integrity gate (index, links, alia
 `make check` runs `gofmt -w` first, so it may modify files — commit the
 result. `go test ./...` deliberately excludes `_examples/` (underscore
 directories are invisible to package patterns); the e2e suite in
-[tests/e2e/](tests/e2e/README.md) builds and runs those programs so they
-cannot rot. The same blind spot applies to the analyzers, so `make lint`,
+[tests/e2e/](tests/e2e/README.md) builds those programs with Go coverage
+instrumentation, runs them with a project-local `GOCOVERDIR`, and fails unless
+the resulting covdata reports covered `reporter` statements. That subprocess
+signal is separate from `coverage.out`, whose 95% floor covers code executed
+inside the `go test` processes. The same package-pattern blind spot applies to
+the analyzers, so `make lint`,
 `make vet`, and the CI Lint and Verify jobs each run a second pass over the
 example package directories named explicitly;
 [`scripts/example-dirs.sh`](scripts/example-dirs.sh) enumerates them (and
@@ -134,11 +138,13 @@ interface; they double as the e2e fixtures.
 - **Unit tests** — `reporter/*_test.go`, one file per implementation; run
   with `make test` or `go test ./reporter/`.
 - **End-to-end** — [`tests/e2e/examples_test.go`](tests/e2e/examples_test.go)
-  builds every `_examples/*` program and runs it as a subprocess in `json`,
-  `text`, `noop`, and an invalid format; the JSON Lines stream is decoded
-  with `reporter.ProgressEvent` (unknown fields rejected), timestamps must be
-  RFC3339, and the last event must be `complete`. It is part of `go test
-  ./...` and of CI's Unit Tests and Race Detection jobs.
+  builds every `_examples/*` program with coverage instrumentation and runs it
+  as a subprocess in `json`, `text`, `noop`, and an invalid format under a
+  project-local `GOCOVERDIR`; the JSON Lines stream is decoded with
+  `reporter.ProgressEvent` (unknown fields rejected), timestamps must be
+  RFC3339, and the last event must be `complete`. The suite rejects absent or
+  zero reporter covdata. It is part of `go test ./...` and of CI's Unit Tests
+  and Race Detection jobs.
 - New or changed behavior needs a focused test including a failure path;
   exact text formatting is pinned by the tests and by
   [docs/specs/reporter-package.md](docs/specs/reporter-package.md) — change
@@ -153,8 +159,10 @@ of golangci-lint from the `Makefile`, with `.golangci.yml`, over the module
 and the `_examples/` programs), **Security Scan** (`govulncheck ./...` with
 `golang.org/x/vuln/cmd/govulncheck@v1.7.0` pinned — reachable Go
 standard-library advisories, since the module has no dependencies), **Unit
-Tests** (`go test -v ./...` with a coverage profile, then the 95.0% total
-statement-coverage floor via `make coverage-check`
+Tests** (`go test -v ./...` with an in-process coverage profile, plus the e2e
+harness's independently asserted instrumented-subprocess signal, then the
+95.0% total statement-coverage floor on the in-process profile via
+`make coverage-check`
 ([`scripts/check-coverage.sh`](scripts/check-coverage.sh)) after
 `make test-coverage-check` self-tests it; the profile is uploaded as the
 `coverage-profile` artifact),
