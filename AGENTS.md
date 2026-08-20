@@ -90,8 +90,8 @@ change to the `Makefile` or to `ci.yml` — see
 Defines a `Reporter` interface for progress reporting with three
 implementations:
 
-- **TextReporter** — human-readable formatted output to an `io.Writer`. Not
-  thread-safe.
+- **TextReporter** — human-readable formatted output to an `io.Writer`; a nil
+  writer discards output without panicking. Not thread-safe.
 - **JSONReporter** — JSON Lines output to an `io.Writer`. Thread-safe via
   mutex.
 - **NoopReporter** — silent discard. Zero-value struct, no constructor needed.

@@ -140,6 +140,33 @@ func TestTextReporter_Complete(t *testing.T) {
 	}
 }
 
+func TestTextReporter_NilWriterIsSilent(t *testing.T) {
+	tests := []struct {
+		name   string
+		report func(*TextReporter)
+	}{
+		{name: "step including repeat", report: func(r *TextReporter) {
+			r.Step(1, 2, "first")
+			r.Step(2, 2, "second")
+		}},
+		{name: "progress", report: func(r *TextReporter) { r.Progress(50, "halfway") }},
+		{name: "message", report: func(r *TextReporter) { r.Message("hello %s", "world") }},
+		{name: "plain message", report: func(r *TextReporter) { r.MessagePlain("hello %s", "world") }},
+		{name: "warning", report: func(r *TextReporter) { r.Warning("careful %s", "now") }},
+		{name: "error", report: func(r *TextReporter) { r.Error(errors.New("boom"), "failed") }},
+		{name: "complete including repeat", report: func(r *TextReporter) {
+			r.Complete("done", nil)
+			r.Complete("still done", map[string]string{"result": "ok"})
+		}},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			test.report(NewTextReporter(nil))
+		})
+	}
+}
+
 func TestTextReporter_IsJSON(t *testing.T) {
 	var buf bytes.Buffer
 	r := NewTextReporter(&buf)
