@@ -1,8 +1,9 @@
 #!/usr/bin/env node
 // Docs-integrity gate: index coverage, relative-link integrity, symlink
-// resolution — thresholds in .coverage-thresholds.json (std ADR-0001, pattern
-// from frostyard/core ADR-0029; the never_relax guardrail follows core
-// ADR-0019). Zero dependencies; Node >= 20. Run: node scripts/check-docs.mjs
+// resolution, and release-config workflow/docs consistency — thresholds in
+// .coverage-thresholds.json (std ADR-0001, pattern from frostyard/core
+// ADR-0029; the never_relax guardrail follows core ADR-0019). Zero
+// dependencies; Node >= 20. Run: node scripts/check-docs.mjs
 import { readFileSync, readdirSync, lstatSync, existsSync, realpathSync } from "node:fs";
 import { join, dirname, resolve, relative, sep } from "node:path";
 
@@ -91,6 +92,27 @@ const metric = readFileSync(join(root, "docs/specs/pr-acceptance-metric.md"), "u
 for (const heading of ["## Definition", "## Rules"]) {
   if (!metric.split("\n").includes(heading)) {
     failures.push(`pin: docs/specs/pr-acceptance-metric.md is missing the "${heading}" heading`);
+  }
+}
+
+// ---- 5. Release-config docs match the workflow's secret guards. ----
+const workflow = readFileSync(join(root, ".github/workflows/ci.yml"), "utf8");
+const qualityLoop = readFileSync(join(root, "docs/design/quality-loop.md"), "utf8");
+for (const guard of [
+  "- name: Validate .goreleaser.yaml\n        if: env.GORELEASER_KEY != ''",
+  "- name: Skip goreleaser check (missing GORELEASER_KEY)\n        if: env.GORELEASER_KEY == ''",
+]) {
+  if (workflow.split(guard).length - 1 !== 1) {
+    failures.push(`release-config: workflow must contain exactly one guarded branch "${guard}"`);
+  }
+}
+const skipMessage = "GORELEASER_KEY unavailable for this run; skipping goreleaser check.";
+if (!workflow.includes(skipMessage)) {
+  failures.push(`release-config: workflow is missing the explicit skip message "${skipMessage}"`);
+}
+for (const wording of ["job reports on every trigger", "job succeeds without validation", "Secretless runs do not validate"]) {
+  if (!qualityLoop.includes(wording)) {
+    failures.push(`release-config: docs/design/quality-loop.md is missing conditional wording "${wording}"`);
   }
 }
 
