@@ -89,6 +89,7 @@ EventTypeComplete = "complete"
 Human-readable formatted output to an `io.Writer`.
 
 - **Constructor:** `NewTextReporter(w io.Writer) *TextReporter`
+- **Nil writer:** treated as `io.Discard`; all reporting methods remain silent and non-panicking
 - **Thread-safe:** No
 - **IsJSON():** `false`
 
