@@ -2,7 +2,7 @@ name: CI
 
 # The PR gate: the Go half mirrors `make check` (fmt, lint, test) plus the
 # race detector, a tidy/vet/gofmt verify job, and a govulncheck security
-# scan (pinned v1.6.0 — std is dependency-free, so this is the reachable
+# scan (pinned v1.7.0 — std is dependency-free, so this is the reachable
 # standard-library advisory signal every consumer inherits); docs-gate is the
 # docs-integrity check from ADR-0001. Actions are pinned by commit SHA with
 # least-privilege permissions (frostyard/core ADR-0021).
