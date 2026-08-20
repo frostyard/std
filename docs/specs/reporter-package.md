@@ -108,6 +108,7 @@ Human-readable formatted output to an `io.Writer`.
 JSON Lines output (one `ProgressEvent` per line) to an `io.Writer`.
 
 - **Constructor:** `NewJSONReporter(w io.Writer) *JSONReporter`
+- **Nil writer:** treated as `io.Discard`; all reporting methods remain silent and non-panicking
 - **Thread-safe:** Yes — `sync.Mutex` protects all `emit()` calls
 - **IsJSON():** `true`
 
