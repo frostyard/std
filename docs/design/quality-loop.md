@@ -54,18 +54,20 @@ PR template ──► review rubric ──► CI gates ──► corrections ─
     standard-library advisory, which every consumer of `reporter` inherits.
   - *Unit Tests* — `go test -v -coverprofile=coverage.out -covermode=atomic
     -coverpkg=github.com/frostyard/std/reporter ./...`: `reporter/` unit tests
-    plus the [e2e suite](../../tests/e2e/README.md), which builds and runs
-    every `_examples/*` program in every output mode. `-coverpkg` attributes
-    coverage to `reporter/` whichever test package exercised it, so the e2e
-    runs count. The job then enforces a **95.0% total statement-coverage
-    floor** with [`scripts/check-coverage.sh`](../../scripts/check-coverage.sh)
-    (`make coverage-check`, ported from frostyard/clix and updex), after
-    self-testing that script against fixture profiles (`make
-    test-coverage-check`) so a broken checker cannot silently pass a
-    regression. The profile is uploaded as the `coverage-profile` artifact.
-    Observed coverage is 97.7%. The floor may tighten, never loosen; there is
-    no coverage service, and `make test-cover` still produces a local
-    `coverage.html`.
+    plus the [e2e suite](../../tests/e2e/README.md). `coverage.out` records
+    reporter code executed inside those `go test` processes; its **95.0% total
+    statement-coverage floor** is enforced with
+    [`scripts/check-coverage.sh`](../../scripts/check-coverage.sh) (`make
+    coverage-check`, ported from frostyard/clix and updex), after self-testing
+    that script against fixture profiles (`make test-coverage-check`) so a
+    broken checker cannot silently pass a regression. The profile is uploaded
+    as the `coverage-profile` artifact. Separately, the e2e harness builds
+    every `_examples/*` program with Go coverage instrumentation, runs every
+    output mode with a project-local `GOCOVERDIR`, and rejects missing or zero
+    reporter covdata; those subprocess counters are an asserted e2e signal,
+    not input to the 95% profile. Observed in-process coverage is 97.8%. The
+    floor may tighten, never loosen; there is no coverage service, and `make
+    test-cover` still produces a local `coverage.html`.
   - *Race Detection* — `go test -race -short ./...`.
   - *Verify* — `go mod tidy` leaves no diff (the stdlib-only constraint is
     visible here: `go.mod` never gains a `require`), `go vet ./...` plus a

@@ -110,7 +110,7 @@ The codebase uses modern Go features:
 - Output captured via `bytes.Buffer`
 - JSON tests unmarshal and validate individual fields (type, message, timestamp presence)
 - Tests verify exact output formatting for text reporter
-- End-to-end: `tests/e2e/examples_test.go` builds each `_examples/*` program and runs it as a subprocess in `json`, `text`, `noop`, and an invalid format, decoding the JSON Lines stream with `reporter.ProgressEvent` (unknown fields rejected; last event `complete`). `go test ./...` skips underscore directories, so this is the only thing that compiles the examples ([tests/e2e/README.md](../../tests/e2e/README.md)).
+- End-to-end: `tests/e2e/examples_test.go` builds each `_examples/*` program with Go coverage instrumentation and runs it as a subprocess in `json`, `text`, `noop`, and an invalid format under a project-local `GOCOVERDIR`, decoding the JSON Lines stream with `reporter.ProgressEvent` (unknown fields rejected; last event `complete`). A final `go tool covdata percent` assertion fails unless the subprocesses covered reporter statements; an empty-directory regression test pins that failure path. This subprocess signal is separate from the in-process `coverage.out` profile and its 95% floor. `go test ./...` skips underscore directories, so this is the only thing that compiles the examples ([tests/e2e/README.md](../../tests/e2e/README.md)).
 
 ## Configuration
 

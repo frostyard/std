@@ -106,10 +106,11 @@ jobs:
         with:
           go-version-file: go.mod
 
-      # Unit tests plus tests/e2e, which builds and runs the _examples/
-      # programs. -coverpkg attributes coverage to the reporter package no
-      # matter which test package exercised it, so the e2e suite's runs of
-      # the example programs count toward the floor below.
+      # Unit tests plus tests/e2e. The profile and floor below cover reporter
+      # code executed in the go test processes. The e2e harness separately
+      # builds coverage-instrumented _examples/ binaries, gives every
+      # subprocess a project-local GOCOVERDIR, and fails unless their covdata
+      # reports covered reporter statements.
       - name: Run tests with coverage
         run: go test -v -coverprofile=coverage.out -covermode=atomic -coverpkg=github.com/frostyard/std/reporter ./...
 
