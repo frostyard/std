@@ -257,6 +257,14 @@ func TestJSONReporter_WriterErrorIsSilent(t *testing.T) {
 	r.Complete("done", func() {})
 }
 
+func TestJSONReporter_NilWriterIsSilent(t *testing.T) {
+	r := NewJSONReporter(nil)
+
+	r.Message("starting %s", "work")
+	r.Progress(50, "halfway")
+	r.Complete("done", map[string]string{"result": "ok"})
+}
+
 // failingWriter is an io.Writer whose Write always fails.
 type failingWriter struct{}
 

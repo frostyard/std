@@ -16,8 +16,12 @@ type JSONReporter struct {
 	encoder *json.Encoder
 }
 
-// NewJSONReporter returns a JSONReporter that writes to w.
+// NewJSONReporter returns a JSONReporter that writes to w. A nil writer is
+// treated as io.Discard so reporting remains silent and non-panicking.
 func NewJSONReporter(w io.Writer) *JSONReporter {
+	if w == nil {
+		w = io.Discard
+	}
 	return &JSONReporter{encoder: json.NewEncoder(w)}
 }
 

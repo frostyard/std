@@ -82,7 +82,7 @@ Callers using concurrent goroutines must use `JSONReporter` or `NoopReporter`.
 ### Constructor conventions
 
 - `NewTextReporter(w io.Writer) *TextReporter` — requires an `io.Writer`
-- `NewJSONReporter(w io.Writer) *JSONReporter` — requires an `io.Writer`
+- `NewJSONReporter(w io.Writer) *JSONReporter` — a nil writer is normalized to `io.Discard`, keeping reporting silent and non-panicking
 - `NoopReporter` — zero-value struct, no constructor needed (`NoopReporter{}`)
 
 ### Zero external dependencies
