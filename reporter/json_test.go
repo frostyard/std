@@ -257,6 +257,46 @@ func TestJSONReporter_WriterErrorIsSilent(t *testing.T) {
 	r.Complete("done", func() {})
 }
 
+func TestJSONReporter_WriterErrorStopsLaterEvents(t *testing.T) {
+	w := &partialThenSuccessWriter{}
+	r := NewJSONReporter(w)
+
+	r.Message("partial")
+	// Do not let json.Encoder's own sticky writer error mask a missing reporter guard.
+	r.encoder = json.NewEncoder(w)
+	r.Complete("must not be appended", nil)
+
+	if !r.failed {
+		t.Error("reporter did not latch primary transport failure")
+	}
+	if w.writes != 1 {
+		t.Fatalf("writer called %d times, want 1 after transport failure", w.writes)
+	}
+	if strings.Contains(w.String(), "must not be appended") {
+		t.Errorf("output contains event written after transport failure: %q", w.String())
+	}
+}
+
+func TestJSONReporter_FallbackWriterErrorStopsLaterEvents(t *testing.T) {
+	w := &partialThenSuccessWriter{}
+	r := NewJSONReporter(w)
+
+	r.Complete("partial fallback", func() {})
+	// Do not let json.Encoder's own sticky writer error mask a missing reporter guard.
+	r.encoder = json.NewEncoder(w)
+	r.Message("must not be appended")
+
+	if !r.failed {
+		t.Error("reporter did not latch fallback transport failure")
+	}
+	if w.writes != 1 {
+		t.Fatalf("writer called %d times, want 1 after fallback transport failure", w.writes)
+	}
+	if strings.Contains(w.String(), "must not be appended") {
+		t.Errorf("output contains event written after fallback transport failure: %q", w.String())
+	}
+}
+
 func TestJSONReporter_NilWriterIsSilent(t *testing.T) {
 	r := NewJSONReporter(nil)
 
@@ -270,6 +310,21 @@ type failingWriter struct{}
 
 func (failingWriter) Write([]byte) (int, error) {
 	return 0, errors.New("write refused")
+}
+
+type partialThenSuccessWriter struct {
+	bytes.Buffer
+	writes int
+}
+
+func (w *partialThenSuccessWriter) Write(p []byte) (int, error) {
+	w.writes++
+	if w.writes == 1 {
+		n := len(p) / 2
+		_, _ = w.Buffer.Write(p[:n])
+		return n, errors.New("partial write refused")
+	}
+	return w.Buffer.Write(p)
 }
 
 func TestJSONReporter_MultipleEvents(t *testing.T) {

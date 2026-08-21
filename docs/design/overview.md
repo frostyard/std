@@ -94,7 +94,7 @@ The module imports nothing outside the Go standard library. This is a hard const
 Three important design decisions for correct JSON serialization:
 - `ProgressEvent.Percent` is `*int` (not `int`) so that 0% is distinguishable from "not reported" — `nil` omits the field, `&0` emits `"percent": 0`
 - `JSONReporter.Error()` with `nil` error emits `{"error": null}` (not `{"error": "<nil>"}`) — the details map is always present for consistent downstream parsing
-- `JSONReporter` never drops an event because its `Details` cannot be encoded: when `Complete` (the only method that forwards arbitrary caller data) receives a value `encoding/json` rejects (func, channel, NaN/Inf, failing `Marshaler`), the event is re-emitted with `Details` set to `{"encoding_error": "<reason>"}` so consumers still see the terminal `complete` line. Only writer (I/O) errors are silently discarded — see [reporter-package.md](../specs/reporter-package.md#jsonreporter-reporterjsongo)
+- `JSONReporter` never drops an event because its `Details` cannot be encoded: when `Complete` (the only method that forwards arbitrary caller data) receives a value `encoding/json` rejects (func, channel, NaN/Inf, failing `Marshaler`), the event is re-emitted with `Details` set to `{"encoding_error": "<reason>"}` so consumers still see the terminal `complete` line. Writer (I/O) errors stay silent to callers but make that reporter fail-stop: every later event is dropped so no valid-looking record can follow a partial JSON fragment — see [reporter-package.md](../specs/reporter-package.md#jsonreporter-reporterjsongo)
 
 ### Modern Go (1.26)
 
