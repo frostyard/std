@@ -14,6 +14,7 @@ import (
 type JSONReporter struct {
 	mu      sync.Mutex
 	encoder *json.Encoder
+	failed  bool
 }
 
 // NewJSONReporter returns a JSONReporter that writes to w. A nil writer is
@@ -32,17 +33,30 @@ func NewJSONReporter(w io.Writer) *JSONReporter {
 // {"encoding_error": "<reason>"} so the line — in particular the terminal
 // `complete` event — still reaches the stream as a valid ProgressEvent.
 // Writer (I/O) errors are discarded: a progress stream has no channel to
-// report its own transport failure and must never abort the caller.
+// report its own transport failure and must never abort the caller. After the
+// first writer error, later events are dropped so they cannot follow a partial
+// JSON record on the same stream.
 func (r *JSONReporter) emit(event ProgressEvent) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
+	if r.failed {
+		return
+	}
 	event.Timestamp = time.Now().UTC().Format(time.RFC3339)
 	err := r.encoder.Encode(event)
-	if err == nil || !isEncodingError(err) {
+	if err == nil {
+		return
+	}
+	if !isEncodingError(err) {
+		r.failed = true
 		return
 	}
 	event.Details = map[string]any{"encoding_error": err.Error()}
-	_ = r.encoder.Encode(event)
+	// The replacement details and fixed event fields are always encodable, so
+	// any fallback error is a writer failure.
+	if err := r.encoder.Encode(event); err != nil {
+		r.failed = true
+	}
 }
 
 // isEncodingError reports whether err is a value-encoding failure from
