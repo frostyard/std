@@ -6,7 +6,7 @@
 # Builds two synthetic Go coverage profiles in a temporary directory -- one
 # whose total statement coverage is above a floor and one below it --
 # and asserts that check-coverage.sh exits 0 for the first and 1 for the
-# second. Exits 0 when both assertions hold.
+# second. Exits 0 when all assertions hold.
 set -eu
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -80,6 +80,20 @@ if COVERAGE_MIN=40 "$CHECK" "$TMP/below.out"; then
 else
     echo "FAIL: COVERAGE_MIN override ignored (exit $?)"
     failures=$((failures + 1))
+fi
+
+echo "--- expect exit 1: explicit floor overrides lower COVERAGE_MIN"
+if COVERAGE_MIN=40 "$CHECK" "$TMP/below.out" 80.0; then
+    echo "FAIL: explicit floor was overridden by COVERAGE_MIN"
+    failures=$((failures + 1))
+else
+    status=$?
+    if [ "$status" -eq 1 ]; then
+        echo "PASS: explicit floor took precedence over COVERAGE_MIN"
+    else
+        echo "FAIL: explicit-floor check exited with unexpected status $status"
+        failures=$((failures + 1))
+    fi
 fi
 
 if [ "$failures" -ne 0 ]; then
