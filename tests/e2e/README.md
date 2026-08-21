@@ -2,8 +2,8 @@
 
 std is a library and ships no binary, so its end-to-end surface is the set of
 runnable programs under [`_examples/`](../../_examples/) (`deploy`,
-`fileprocess`, `healthcheck`, `migration`), each of which drives the whole
-`reporter.Reporter` interface behind a `-format text|json|noop` flag. The
+`fileprocess`, `healthcheck`, `migration`), which collectively exercise every
+`reporter.Reporter` method, each run behind a `-format text|json|noop` flag. The
 suite in [`examples_test.go`](examples_test.go) builds every example with Go
 coverage instrumentation and runs it as a real subprocess:
 
@@ -25,6 +25,12 @@ the subprocess counters report covered
 regression test proves that removing the executions or their `GOCOVERDIR`
 wiring cannot leave this signal green. This covdata signal is separate from
 the in-process `coverage.out` profile and its 95% floor.
+
+`TestExamplesCollectivelyExerciseReporter` pins the collective-coverage claim
+above: it reflects the `reporter.Reporter` method set and parses every
+`_examples/*/main.go`, failing unless the four programs together call all of
+the interface's methods — so a new `Reporter` method fails the suite until an
+example exercises it.
 
 `go test ./...` skips underscore directories, so without this suite nothing
 compiled the examples. Run it with:

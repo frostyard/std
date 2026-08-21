@@ -16,11 +16,16 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"go/ast"
+	"go/parser"
+	"go/token"
 	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"reflect"
 	"runtime"
+	"sort"
 	"strconv"
 	"strings"
 	"testing"
@@ -351,4 +356,92 @@ func validEventType(et reporter.EventType) bool {
 		return true
 	}
 	return false
+}
+
+// TestExamplesCollectivelyExerciseReporter pins the tests/e2e/README claim that
+// the four runnable examples *collectively* exercise every reporter.Reporter
+// method (no single example drives the whole interface). It takes the method
+// set from the interface itself by reflection — so a newly added Reporter
+// method fails this test until an example calls it — and finds the calls by
+// parsing every _examples/<name>/main.go and collecting the methods invoked on
+// each program's `reporter.Reporter` variable. It reads source only; the
+// subprocess behaviour and covdata tests are unchanged.
+func TestExamplesCollectivelyExerciseReporter(t *testing.T) {
+	root := moduleRoot(t)
+
+	iface := reflect.TypeOf((*reporter.Reporter)(nil)).Elem()
+	seen := make(map[string]bool, iface.NumMethod())
+	for i := 0; i < iface.NumMethod(); i++ {
+		seen[iface.Method(i).Name] = false
+	}
+
+	for _, name := range exampleNames(t, root) {
+		collectReporterMethodCalls(t, filepath.Join(root, "_examples", name, "main.go"), seen)
+	}
+
+	var missing []string
+	for method, called := range seen {
+		if !called {
+			missing = append(missing, method)
+		}
+	}
+	sort.Strings(missing)
+	if len(missing) > 0 {
+		t.Errorf("no _examples program calls reporter.Reporter method(s) %v; the examples must collectively exercise every interface method", missing)
+	}
+}
+
+// collectReporterMethodCalls parses one example's main.go and marks every
+// method in seen that is called on a variable declared as reporter.Reporter.
+func collectReporterMethodCalls(t *testing.T, path string, seen map[string]bool) {
+	t.Helper()
+	fset := token.NewFileSet()
+	file, err := parser.ParseFile(fset, path, nil, 0)
+	if err != nil {
+		t.Fatalf("parse %s: %v", path, err)
+	}
+
+	// The reporter variables: those declared `var <name> reporter.Reporter`.
+	reporters := map[string]bool{}
+	ast.Inspect(file, func(n ast.Node) bool {
+		spec, ok := n.(*ast.ValueSpec)
+		if !ok || spec.Type == nil {
+			return true
+		}
+		if isReporterType(spec.Type) {
+			for _, name := range spec.Names {
+				reporters[name.Name] = true
+			}
+		}
+		return true
+	})
+
+	ast.Inspect(file, func(n ast.Node) bool {
+		call, ok := n.(*ast.CallExpr)
+		if !ok {
+			return true
+		}
+		sel, ok := call.Fun.(*ast.SelectorExpr)
+		if !ok {
+			return true
+		}
+		recv, ok := sel.X.(*ast.Ident)
+		if !ok || !reporters[recv.Name] {
+			return true
+		}
+		if _, tracked := seen[sel.Sel.Name]; tracked {
+			seen[sel.Sel.Name] = true
+		}
+		return true
+	})
+}
+
+// isReporterType reports whether an AST type expression is `reporter.Reporter`.
+func isReporterType(expr ast.Expr) bool {
+	sel, ok := expr.(*ast.SelectorExpr)
+	if !ok {
+		return false
+	}
+	pkg, ok := sel.X.(*ast.Ident)
+	return ok && pkg.Name == "reporter" && sel.Sel.Name == "Reporter"
 }
