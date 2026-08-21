@@ -6,7 +6,7 @@ GOFMT := gofmt
 # Pinned golangci-lint release. The CI Lint job installs exactly this value
 # (see .github/workflows/ci.yml) and `make lint` warns when the installed
 # binary differs. Bump it in a dedicated commit.
-GOLANGCI_LINT_VERSION := 2.12.2
+GOLANGCI_LINT_VERSION := 2.13.1
 GOFILES := $(shell find . -type f -name '*.go' -not -path "./vendor/*")
 # The _examples/ programs, enumerated at run time by scripts/example-dirs.sh.
 # Go package patterns ignore directories starting with "_", so `./...` never
