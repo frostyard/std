@@ -67,4 +67,11 @@ func main() {
 		fmt.Sprintf("Health check: %d healthy, %d degraded, %d down", healthy, degraded, down),
 		nil,
 	)
+
+	// Exit 1 when any service is down, so the process's own exit code reflects
+	// the outage independent of the reporter's own output; a purely degraded
+	// or fully healthy run still exits 0.
+	if down > 0 {
+		os.Exit(1)
+	}
 }

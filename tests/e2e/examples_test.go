@@ -145,11 +145,19 @@ func TestExamples(t *testing.T) {
 			t.Parallel()
 			bin := buildExample(t, root, binDir, name)
 
+			// healthcheck's fixture data includes a down service, so it
+			// exits 1 to reflect the detected outage; every other example
+			// exits 0.
+			wantExitCode := 0
+			if name == "healthcheck" {
+				wantExitCode = 1
+			}
+
 			t.Run("json", func(t *testing.T) {
 				t.Parallel()
 				stdout, stderr, code := run(t, bin, coverageDir, "-format", "json")
-				if code != 0 {
-					t.Fatalf("exit %d, stderr: %s", code, stderr)
+				if code != wantExitCode {
+					t.Fatalf("exit %d, want %d, stderr: %s", code, wantExitCode, stderr)
 				}
 				if stderr != "" {
 					t.Errorf("unexpected stderr in json mode: %q", stderr)
@@ -174,8 +182,8 @@ func TestExamples(t *testing.T) {
 			t.Run("text", func(t *testing.T) {
 				t.Parallel()
 				stdout, stderr, code := run(t, bin, coverageDir, "-format", "text")
-				if code != 0 {
-					t.Fatalf("exit %d, stderr: %s", code, stderr)
+				if code != wantExitCode {
+					t.Fatalf("exit %d, want %d, stderr: %s", code, wantExitCode, stderr)
 				}
 				if strings.TrimSpace(stdout) == "" {
 					t.Error("text mode produced no output")
@@ -189,8 +197,8 @@ func TestExamples(t *testing.T) {
 			t.Run("noop", func(t *testing.T) {
 				t.Parallel()
 				stdout, stderr, code := run(t, bin, coverageDir, "-format", "noop")
-				if code != 0 {
-					t.Fatalf("exit %d, stderr: %s", code, stderr)
+				if code != wantExitCode {
+					t.Fatalf("exit %d, want %d, stderr: %s", code, wantExitCode, stderr)
 				}
 				if stderr != "" {
 					t.Errorf("noop mode wrote to stderr: %q", stderr)
