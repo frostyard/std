@@ -18,6 +18,12 @@ coverage instrumentation and runs it as a real subprocess:
   false);
 - `-format bogus` — exit 1 with an "unknown format" message on stderr.
 
+`healthcheck` is the one exception to the exit-0 expectation above: its fixture
+data always includes a down service, so in every format (`text`, `json`,
+`noop`) it exits 1 to reflect the detected outage on the process's own exit
+code, independent of the reporter output described above. The other three
+examples (`deploy`, `fileprocess`, `migration`) keep exiting 0.
+
 Every execution receives a project-local, test-temporary `GOCOVERDIR`. After
 all modes finish, the suite runs `go tool covdata percent` and fails unless
 the subprocess counters report covered
