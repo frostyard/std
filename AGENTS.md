@@ -48,7 +48,7 @@ whichever agent you are:
 - `make`
 - [`golangci-lint`](https://golangci-lint.run/) v2 for `make lint`
   (configured by [`.golangci.yml`](.golangci.yml); the release CI installs is
-  pinned as `GOLANGCI_LINT_VERSION` in the `Makefile`, currently 2.12.2 —
+  pinned as `GOLANGCI_LINT_VERSION` in the `Makefile`, currently 2.13.1 —
   the Makefile fails with the pinned `go install` command when the binary is
   absent, warns when the installed version differs from the pin, and fails on
   findings; CI always runs the pinned release)
