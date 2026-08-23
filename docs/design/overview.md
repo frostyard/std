@@ -65,7 +65,7 @@ All consumers depend on the `Reporter` interface, never on concrete types. This 
 
 ```go
 if !r.IsJSON() {
-    fmt.Println("Tip: use --format json for machine-readable output")
+	fmt.Println("\nTip: run with --format=json for machine-readable output")
 }
 ```
 
