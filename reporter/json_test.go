@@ -203,6 +203,7 @@ func TestJSONReporter_Complete_UnencodableDetails(t *testing.T) {
 		{name: "NaN", details: math.NaN()},
 		{name: "channel", details: make(chan int)},
 		{name: "failing marshaler", details: failingMarshaler{}},
+		{name: "panicking marshaler", details: panickingMarshaler{}},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -246,6 +247,44 @@ type failingMarshaler struct{}
 
 func (failingMarshaler) MarshalJSON() ([]byte, error) {
 	return nil, errors.New("marshal refused")
+}
+
+// panickingMarshaler is a json.Marshaler whose MarshalJSON always panics, so
+// json.Encoder.Encode panics instead of returning an error.
+type panickingMarshaler struct{}
+
+func (panickingMarshaler) MarshalJSON() ([]byte, error) {
+	panic("marshal refused")
+}
+
+func TestJSONReporter_PanickingMarshalerDoesNotPanicCaller(t *testing.T) {
+	var buf bytes.Buffer
+	r := NewJSONReporter(&buf)
+
+	r.Message("m1")
+	r.Warning("w1")
+	r.Complete("done", panickingMarshaler{})
+	r.Error(errors.New("boom"), "failed")
+
+	lines := strings.Split(strings.TrimSpace(buf.String()), "\n")
+	if len(lines) != 4 {
+		t.Fatalf("got %d lines, want exactly 4:\n%s", len(lines), buf.String())
+	}
+	var completeEvent ProgressEvent
+	if err := json.Unmarshal([]byte(lines[2]), &completeEvent); err != nil {
+		t.Fatalf("failed to parse JSON output: %v", err)
+	}
+	if completeEvent.Type != EventTypeComplete {
+		t.Errorf("event.Type = %q, want %q", completeEvent.Type, EventTypeComplete)
+	}
+	details, ok := completeEvent.Details.(map[string]any)
+	if !ok {
+		t.Fatalf("event.Details = %T, want map[string]any", completeEvent.Details)
+	}
+	reason, ok := details["encoding_error"].(string)
+	if !ok || reason == "" {
+		t.Errorf("details[\"encoding_error\"] = %#v, want non-empty string", details["encoding_error"])
+	}
 }
 
 func TestJSONReporter_WriterErrorIsSilent(t *testing.T) {

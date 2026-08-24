@@ -28,8 +28,8 @@ func NewJSONReporter(w io.Writer) *JSONReporter {
 
 // emit stamps the event and writes it as one JSON line. When the event
 // cannot be encoded because the caller-supplied Details value is not
-// JSON-encodable (a func, a channel, NaN/Inf, or a Marshaler that fails), the
-// same event is re-emitted with Details replaced by
+// JSON-encodable (a func, a channel, NaN/Inf, or a Marshaler that fails or
+// panics), the same event is re-emitted with Details replaced by
 // {"encoding_error": "<reason>"} so the line — in particular the terminal
 // `complete` event — still reaches the stream as a valid ProgressEvent.
 // Writer (I/O) errors are discarded: a progress stream has no channel to
@@ -43,7 +43,7 @@ func (r *JSONReporter) emit(event ProgressEvent) {
 		return
 	}
 	event.Timestamp = time.Now().UTC().Format(time.RFC3339)
-	err := r.encoder.Encode(event)
+	err := r.safeEncode(event)
 	if err == nil {
 		return
 	}
@@ -54,9 +54,34 @@ func (r *JSONReporter) emit(event ProgressEvent) {
 	event.Details = map[string]any{"encoding_error": err.Error()}
 	// The replacement details and fixed event fields are always encodable, so
 	// any fallback error is a writer failure.
-	if err := r.encoder.Encode(event); err != nil {
+	if err := r.safeEncode(event); err != nil {
 		r.failed = true
 	}
+}
+
+// safeEncode encodes event, recovering a panic raised while marshaling it —
+// for example from a caller-supplied Details value's MarshalJSON panicking
+// instead of returning an error — so a hostile or buggy Details value cannot
+// crash the caller. A recovered panic is reported as an encodingPanicError so
+// isEncodingError routes it through the same fallback path as a Marshaler
+// that returns an error.
+func (r *JSONReporter) safeEncode(event ProgressEvent) (err error) {
+	defer func() {
+		if p := recover(); p != nil {
+			err = encodingPanicError{value: p}
+		}
+	}()
+	return r.encoder.Encode(event)
+}
+
+// encodingPanicError wraps a panic recovered while encoding a caller-supplied
+// value.
+type encodingPanicError struct {
+	value any
+}
+
+func (e encodingPanicError) Error() string {
+	return fmt.Sprintf("panic encoding progress event: %v", e.value)
 }
 
 // isEncodingError reports whether err is a value-encoding failure from
@@ -66,7 +91,8 @@ func isEncodingError(err error) bool {
 	var typeErr *json.UnsupportedTypeError
 	var valueErr *json.UnsupportedValueError
 	var marshalerErr *json.MarshalerError
-	return errors.As(err, &typeErr) || errors.As(err, &valueErr) || errors.As(err, &marshalerErr)
+	var panicErr encodingPanicError
+	return errors.As(err, &typeErr) || errors.As(err, &valueErr) || errors.As(err, &marshalerErr) || errors.As(err, &panicErr)
 }
 
 func (r *JSONReporter) Step(step, total int, name string) {
