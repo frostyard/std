@@ -61,6 +61,7 @@ whichever agent you are:
 
 ```bash
 make check           # fmt + lint + vet + test + coverage floor — the local gate; run before every PR
+make ci              # credential-free gate mirroring CI's jobs in CI's fail-fast order: tidy diff, vet, gofmt, lint, unit test, race, cross-arch build of _examples/ (core ADR-0038)
 make verify          # credential-free, non-mutating gate (what a read-only reviewer runs): tidy diff, gofmt -l, lint at the exact pin, vet, tests
 make test            # unit + e2e; asserts subprocess coverage and writes the in-process coverage profile
 make lint            # golangci-lint run (.golangci.yml), module + _examples/
@@ -136,8 +137,6 @@ interface; they double as the e2e fixtures.
 - [`.editorconfig`](.editorconfig) carries the editor defaults (tabs in Go
   and Makefiles, two-space YAML/JSON/Markdown, LF, final newline)
 - Error strings are lowercase without trailing punctuation
-- The `TestI` prefix stays reserved for environment-requiring integration
-  tests (core ADR-0022); nothing here needs it today
 
 ## Testing
 
