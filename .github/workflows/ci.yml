@@ -91,6 +91,11 @@ jobs:
       - name: Run govulncheck
         run: govulncheck ./...
 
+      - name: Run govulncheck over the _examples programs
+        run: |
+          dirs="$(./scripts/example-dirs.sh)"
+          govulncheck $dirs
+
   test:
     name: Unit Tests
     runs-on: ubuntu-latest

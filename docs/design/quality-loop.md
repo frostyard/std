@@ -53,7 +53,10 @@ PR template ──► review rubric ──► CI gates ──► corrections ─
   - *Security Scan* — `govulncheck ./...` with
     `golang.org/x/vuln/cmd/govulncheck@v1.7.0` pinned (the same job clix and
     updex run): with no dependencies the signal is a reachable Go
-    standard-library advisory, which every consumer of `reporter` inherits.
+    standard-library advisory, which every consumer of `reporter` inherits. It
+    runs twice: once over the packages `./...` matches, once over the
+    [`_examples/`](#example-programs-are-analyzed-explicitly) program
+    directories.
   - *Unit Tests* — `go test -v -coverprofile=coverage.out -covermode=atomic
     -coverpkg=github.com/frostyard/std/reporter ./...`: `reporter/` unit tests
     plus the [e2e suite](../../tests/e2e/README.md). `coverage.out` records
@@ -103,11 +106,11 @@ they never looked at them. The analyzers therefore receive the example
 package directories by name. [`scripts/example-dirs.sh`](../../scripts/example-dirs.sh)
 enumerates them at run time (every `_examples/*/` directory holding at least
 one `.go` file) and exits non-zero when the list is empty, so a silent
-regression to analyzing nothing fails the gate. Both the CI Lint and Verify
-jobs and the `lint` and `vet` Makefile targets call that one script, which is
-what keeps the [`.golangci.yml`](../../.golangci.yml) promise that local and
-CI findings agree, and means a new `_examples/<program>/` is analyzed without
-editing [ci.yml](../../.github/workflows/ci.yml) or the
+regression to analyzing nothing fails the gate. The CI Lint, Security Scan,
+and Verify jobs and the `lint` and `vet` Makefile targets all call that one
+script, which is what keeps the [`.golangci.yml`](../../.golangci.yml) promise
+that local and CI findings agree, and means a new `_examples/<program>/` is
+analyzed without editing [ci.yml](../../.github/workflows/ci.yml) or the
 [`Makefile`](../../Makefile).
 - **Learn** — corrections land in
   [.memory/corrections.jsonl](../../.memory/README.md) (append-only,
