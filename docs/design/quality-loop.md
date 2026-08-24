@@ -39,11 +39,13 @@ PR template ──► review rubric ──► CI gates ──► corrections ─
   (`merge_group`), SHA-pinned with least-privilege permissions:
   - *Lint* — golangci-lint v2 configured by
     [`.golangci.yml`](../../.golangci.yml) (`standard` linters, `gofmt`
-    formatter); the same file `make lint` uses. The release is pinned as
-    `GOLANGCI_LINT_VERSION` in the [`Makefile`](../../Makefile): the CI job
-    installs exactly that version; locally it is a prerequisite, and `make
-    lint` fails with its pinned `go install` command when the binary is absent
-    and warns when the version differs. A linter release therefore cannot
+    formatter); the same file `make lint` uses. The release is pinned in
+    [`mise.toml`](../../mise.toml) with its checksums in
+    [`mise.lock`](../../mise.lock) (core ADR-0043): the CI job installs
+    exactly that version through `jdx/mise-action`; locally `mise install`
+    provisions it, the [`Makefile`](../../Makefile) reads the same pin,
+    and `make lint` fails with `mise install` when the binary is absent and
+    warns when the version differs. A linter release therefore cannot
     change or disappear from the gate without a failure. It runs twice: once
     over the packages `./...` matches, once over the
     [`_examples/`](#example-programs-are-analyzed-explicitly) program
