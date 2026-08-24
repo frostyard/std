@@ -28,10 +28,11 @@ func NewJSONReporter(w io.Writer) *JSONReporter {
 
 // emit stamps the event and writes it as one JSON line. When the event
 // cannot be encoded because the caller-supplied Details value is not
-// JSON-encodable (a func, a channel, NaN/Inf, or a Marshaler that fails), the
-// same event is re-emitted with Details replaced by
+// JSON-encodable (a func, a channel, NaN/Inf, or a Marshaler that fails or
+// panics), the same event is re-emitted with Details replaced by
 // {"encoding_error": "<reason>"} so the line — in particular the terminal
-// `complete` event — still reaches the stream as a valid ProgressEvent.
+// `complete` event — still reaches the stream as a valid ProgressEvent. A
+// panicking Marshaler is handled the same way as one that returns an error.
 // Writer (I/O) errors are discarded: a progress stream has no channel to
 // report its own transport failure and must never abort the caller. After the
 // first writer error, later events are dropped so they cannot follow a partial
@@ -43,7 +44,7 @@ func (r *JSONReporter) emit(event ProgressEvent) {
 		return
 	}
 	event.Timestamp = time.Now().UTC().Format(time.RFC3339)
-	err := r.encoder.Encode(event)
+	err := encodeRecover(r.encoder, event)
 	if err == nil {
 		return
 	}
@@ -59,6 +60,24 @@ func (r *JSONReporter) emit(event ProgressEvent) {
 	}
 }
 
+// errMarshalerPanic marks an encoding failure recovered from a Details
+// value's Marshaler panicking, so isEncodingError routes it through the same
+// fallback as a Marshaler that returns an error.
+var errMarshalerPanic = errors.New("marshaler panicked")
+
+// encodeRecover runs enc.Encode and converts a panic raised while marshaling
+// event.Details (for example a caller-supplied Marshaler implementation that
+// panics instead of returning an error) into an error, so it cannot escape
+// emit() and crash the caller.
+func encodeRecover(enc *json.Encoder, event ProgressEvent) (err error) {
+	defer func() {
+		if p := recover(); p != nil {
+			err = fmt.Errorf("%w: %v", errMarshalerPanic, p)
+		}
+	}()
+	return enc.Encode(event)
+}
+
 // isEncodingError reports whether err is a value-encoding failure from
 // encoding/json rather than a writer error. json.Encoder marshals the whole
 // value before writing, so an encoding failure leaves nothing on the wire.
@@ -66,7 +85,7 @@ func isEncodingError(err error) bool {
 	var typeErr *json.UnsupportedTypeError
 	var valueErr *json.UnsupportedValueError
 	var marshalerErr *json.MarshalerError
-	return errors.As(err, &typeErr) || errors.As(err, &valueErr) || errors.As(err, &marshalerErr)
+	return errors.As(err, &typeErr) || errors.As(err, &valueErr) || errors.As(err, &marshalerErr) || errors.Is(err, errMarshalerPanic)
 }
 
 func (r *JSONReporter) Step(step, total int, name string) {

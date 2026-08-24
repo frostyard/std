@@ -203,6 +203,7 @@ func TestJSONReporter_Complete_UnencodableDetails(t *testing.T) {
 		{name: "NaN", details: math.NaN()},
 		{name: "channel", details: make(chan int)},
 		{name: "failing marshaler", details: failingMarshaler{}},
+		{name: "panicking marshaler", details: panickingMarshaler{}},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -246,6 +247,14 @@ type failingMarshaler struct{}
 
 func (failingMarshaler) MarshalJSON() ([]byte, error) {
 	return nil, errors.New("marshal refused")
+}
+
+// panickingMarshaler is a json.Marshaler whose MarshalJSON always panics, so
+// emit must recover it rather than let it crash the caller.
+type panickingMarshaler struct{}
+
+func (panickingMarshaler) MarshalJSON() ([]byte, error) {
+	panic("marshal panicked")
 }
 
 func TestJSONReporter_WriterErrorIsSilent(t *testing.T) {
