@@ -1,4 +1,4 @@
-.PHONY: all clean fmt lint lint-version-check vet verify test test-cover coverage-check test-coverage-check tidy check bump help
+.PHONY: all clean fmt lint lint-version-check vet verify tidy-diff gofmt-check test test-cover coverage-check test-coverage-check tidy check ci bump help
 
 # Go commands
 GO := go
@@ -85,13 +85,21 @@ lint-version-check:
 	if [ -n "$$built" ] && [ "$$(printf '%s\n%s\n' "$(GO_TOOLCHAIN)" "$$built" | sort -V | head -1)" != "$(GO_TOOLCHAIN)" ]; then \
 		echo "golangci-lint $(GOLANGCI_LINT_VERSION) was built with go$$built, older than go.mod's toolchain go$(GO_TOOLCHAIN): bump golangci-lint first (core ADR-0043)"; exit 1; fi
 
+## tidy-diff: Fail unless go.mod is tidy (credential-free; std ships no go.sum)
+tidy-diff:
+	$(GO) mod tidy -diff
+
+## gofmt-check: Fail if any Go source file needs gofmt -w
+gofmt-check:
+	@unformatted="$$($(GOFMT) -l $(GOFILES))"; \
+	if [ -n "$$unformatted" ]; then echo "$$unformatted"; echo "gofmt: files need formatting (run make fmt)"; exit 1; fi
+
 ## verify: Credential-free, non-mutating gate (what a read-only reviewer runs): tidy diff, gofmt -l, lint at the exact pin, vet, tests
 verify:
 	@echo "==> verify: go.mod is tidy"
-	$(GO) mod tidy -diff
+	@$(MAKE) --no-print-directory tidy-diff
 	@echo "==> verify: gofmt"
-	@unformatted="$$($(GOFMT) -l $(GOFILES))"; \
-	if [ -n "$$unformatted" ]; then echo "$$unformatted"; echo "gofmt: files need formatting (run make fmt)"; exit 1; fi
+	@$(MAKE) --no-print-directory gofmt-check
 	@echo "==> verify: golangci-lint $(GOLANGCI_LINT_VERSION) (built with go >= $(GO_TOOLCHAIN))"
 	@$(MAKE) --no-print-directory lint-version-check
 	@$(MAKE) --no-print-directory lint vet
@@ -100,6 +108,32 @@ verify:
 
 ## check: Run fmt, lint, vet, test, and the coverage floor
 check: fmt lint vet test test-coverage-check coverage-check
+
+## ci: Credential-free gate mirroring CI's jobs in CI's fail-fast order: tidy diff, vet, gofmt, lint, unit test, race, cross-arch build of _examples/ (core ADR-0038)
+ci:
+	@echo "==> ci: go.mod is tidy"
+	@$(MAKE) --no-print-directory tidy-diff
+	@echo "==> ci: go vet"
+	@$(MAKE) --no-print-directory vet
+	@echo "==> ci: gofmt"
+	@$(MAKE) --no-print-directory gofmt-check
+	@echo "==> ci: golangci-lint $(GOLANGCI_LINT_VERSION) (built with go >= $(GO_TOOLCHAIN))"
+	@$(MAKE) --no-print-directory lint-version-check
+	@$(MAKE) --no-print-directory lint
+	@echo "==> ci: unit tests"
+	@$(MAKE) --no-print-directory test
+	@echo "==> ci: race detector"
+	$(GO) test -race -short ./...
+	@echo "==> ci: cross-arch build of _examples/"
+	@dirs="$$($(EXAMPLE_DIRS_CMD))" || exit 1; \
+	for dir in $$dirs; do \
+		for goos_goarch in linux/amd64 linux/arm64; do \
+			goos="$${goos_goarch%/*}"; goarch="$${goos_goarch#*/}"; \
+			echo "GOOS=$$goos GOARCH=$$goarch $(GO) build $$dir"; \
+			GOOS=$$goos GOARCH=$$goarch $(GO) build -o /dev/null "$$dir" || exit 1; \
+		done; \
+	done
+	@echo "==> ci passed"
 
 ## bump: Tag and push next version (requires clean tree and svu)
 bump:
