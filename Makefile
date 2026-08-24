@@ -1,4 +1,4 @@
-.PHONY: all clean fmt lint vet test test-cover coverage-check test-coverage-check tidy check bump help
+.PHONY: all clean fmt lint vet verify test test-cover coverage-check test-coverage-check tidy check bump help
 
 # Go commands
 GO := go
@@ -69,6 +69,20 @@ tidy:
 clean:
 	rm -f coverage.out coverage.html
 	$(GO) clean
+
+## verify: Credential-free, non-mutating gate (what a read-only reviewer runs): tidy diff, gofmt -l, lint at the exact pin, vet, tests
+verify:
+	@echo "==> verify: go.mod is tidy"
+	$(GO) mod tidy -diff
+	@echo "==> verify: gofmt"
+	@unformatted="$$($(GOFMT) -l $(GOFILES))"; \
+	if [ -n "$$unformatted" ]; then echo "$$unformatted"; echo "gofmt: files need formatting (run make fmt)"; exit 1; fi
+	@echo "==> verify: golangci-lint $(GOLANGCI_LINT_VERSION)"
+	@installed="$$(golangci-lint version --short 2>/dev/null)" || { echo "golangci-lint $(GOLANGCI_LINT_VERSION) is required for make verify (not installed)"; exit 1; }; \
+	if [ "$$installed" != "$(GOLANGCI_LINT_VERSION)" ]; then echo "expected golangci-lint $(GOLANGCI_LINT_VERSION), found $$installed"; exit 1; fi
+	@$(MAKE) --no-print-directory lint vet
+	@echo "==> verify: tests"
+	$(GO) test ./...
 
 ## check: Run fmt, lint, vet, test, and the coverage floor
 check: fmt lint vet test test-coverage-check coverage-check
