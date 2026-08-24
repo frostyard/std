@@ -43,15 +43,17 @@ whichever agent you are:
 
 ### Prerequisites
 
-- **Go 1.26.7 or newer** (`go.mod` targets `go 1.26.7`; CI uses the version
-  `go.mod` names)
+- **Go 1.26.7** (`go.mod`'s `toolchain go1.26.7` line is the only Go pin;
+  CI, `mise`, and Snowcat workers all read it)
 - `make`
-- [`golangci-lint`](https://golangci-lint.run/) v2 for `make lint`
-  (configured by [`.golangci.yml`](.golangci.yml); the release CI installs is
-  pinned as `GOLANGCI_LINT_VERSION` in the `Makefile`, currently 2.13.1 —
-  the Makefile fails with the pinned `go install` command when the binary is
-  absent, warns when the installed version differs from the pin, and fails on
-  findings; CI always runs the pinned release)
+- [`mise`](https://mise.jdx.dev/) to provision every other pinned tool:
+  `mise install` reads [`mise.toml`](mise.toml) and verifies each download
+  against [`mise.lock`](mise.lock) (core ADR-0043). Today that is
+  [`golangci-lint`](https://golangci-lint.run/) v2 for `make lint`
+  (configured by [`.golangci.yml`](.golangci.yml)); the Makefile reads the
+  pin from `mise.toml`, fails with `mise install` when the binary is absent,
+  warns when the installed version differs, and fails on findings; CI
+  installs the same lock through `jdx/mise-action`
 - [`svu`](https://github.com/caarlos0/svu) only for `make bump`
 - Node 20+ only for `node scripts/check-docs.mjs` (zero dependencies)
 
@@ -124,10 +126,13 @@ interface; they double as the e2e fixtures.
 - Formatting is `gofmt` (enforced by `make fmt` and the `gofmt` formatter in
   `.golangci.yml`); linting is golangci-lint's `standard` set —
   `.golangci.yml` is the single source of what `make lint` and CI run, and
-  `GOLANGCI_LINT_VERSION` in the `Makefile` is the single source of which
-  golangci-lint release runs it (the CI Lint job reads that variable and
-  `make lint` warns on a mismatch), so a new finding after a deliberate
-  linter bump is fixed in code, never hidden by loosening the config
+  `mise.toml` is the single source of which golangci-lint release runs it
+  (the Makefile and the CI Lint job both read that pin, `mise.lock` carries
+  its checksums, and `make lint` warns on a mismatch), so a new finding
+  after a deliberate linter bump is fixed in code, never hidden by loosening
+  the config. Bump golangci-lint before bumping `go.mod`'s toolchain, as one
+  change: `make verify` refuses a linter built with an older Go than the
+  toolchain
 - [`.editorconfig`](.editorconfig) carries the editor defaults (tabs in Go
   and Makefiles, two-space YAML/JSON/Markdown, LF, final newline)
 - Error strings are lowercase without trailing punctuation
@@ -155,9 +160,9 @@ interface; they double as the e2e fixtures.
 
 [`.github/workflows/ci.yml`](.github/workflows/ci.yml) runs on every push to
 `main`, every pull request, and every merge-queue branch (`merge_group`):
-**Lint** (the `GOLANGCI_LINT_VERSION` release
-of golangci-lint from the `Makefile`, with `.golangci.yml`, over the module
-and the `_examples/` programs), **Security Scan** (`govulncheck ./...` with
+**Lint** (the golangci-lint release
+`mise.toml` pins, installed from `mise.lock` by `jdx/mise-action`, with
+`.golangci.yml`, over the module and the `_examples/` programs), **Security Scan** (`govulncheck ./...` with
 `golang.org/x/vuln/cmd/govulncheck@v1.7.0` pinned — reachable Go
 standard-library advisories, since the module has no dependencies), **Unit
 Tests** (`go test -v ./...` with an in-process coverage profile, plus the e2e
