@@ -75,8 +75,9 @@ PR template ──► review rubric ──► CI gates ──► corrections ─
     visible here: `go.mod` never gains a `require`), `go vet ./...` plus a
     second `go vet` over the
     [`_examples/`](#example-programs-are-analyzed-explicitly) program
-    directories, `gofmt -l .` empty. `make verify` runs this same
-    credential-free, non-mutating gate locally.
+    directories, `gofmt -l .` empty. `make verify` is this same
+    credential-free, non-mutating gate run locally, but broader: tidy diff,
+    gofmt -l, lint at the exact pin, vet, and tests.
   - *Docs integrity* (`docs-gate`): `node scripts/check-docs.mjs` checks
     docs-index coverage, relative-link integrity, symlink resolution, and the
     metric's pinned headings against
