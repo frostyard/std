@@ -74,6 +74,14 @@ PR template ──► review rubric ──► CI gates ──► corrections ─
     floor may tighten, never loosen; there is no coverage service, and `make
     test-cover` still produces a local `coverage.html`.
   - *Race Detection* — `go test -race -short ./...`.
+  - *Examples Cross-Arch Build* — every
+    [`_examples/`](#example-programs-are-analyzed-explicitly) program
+    directory built with `GOOS=linux GOARCH=amd64` and `GOOS=linux
+    GOARCH=arm64`, using the same `scripts/example-dirs.sh` enumeration as the
+    Lint, Security Scan, and Verify jobs. This is the hosted half of what
+    `make ci` mirrors locally (frostyard/core ADR-0038): a program that only
+    fails to cross-compile for one target would otherwise pass every other
+    job unnoticed.
   - *Verify* — `go mod tidy` leaves no diff (the stdlib-only constraint is
     visible here: `go.mod` never gains a `require`), `go vet ./...` plus a
     second `go vet` over the
@@ -108,8 +116,9 @@ package directories by name. [`scripts/example-dirs.sh`](../../scripts/example-d
 enumerates them at run time (every `_examples/*/` directory holding at least
 one `.go` file) and exits non-zero when the list is empty, so a silent
 regression to analyzing nothing fails the gate. The CI Lint, Security Scan,
-and Verify jobs and the `lint` and `vet` Makefile targets all call that one
-script, which is what keeps the [`.golangci.yml`](../../.golangci.yml) promise
+Examples Cross-Arch Build, and Verify jobs and the `lint` and `vet` Makefile
+targets all call that one script, which is what keeps the
+[`.golangci.yml`](../../.golangci.yml) promise
 that local and CI findings agree, and means a new `_examples/<program>/` is
 analyzed without editing [ci.yml](../../.github/workflows/ci.yml) or the
 [`Makefile`](../../Makefile).
@@ -153,6 +162,7 @@ Re-run every gate locally before pushing:
 make check
 node scripts/check-docs.mjs
 go test -race -short ./...        # what the Race Detection job runs
+make ci                           # includes what the Examples Cross-Arch Build job runs
 ```
 
 Failure modes: a broken alias or missing index line fails docs-gate (fix the
