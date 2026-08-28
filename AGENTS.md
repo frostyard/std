@@ -188,7 +188,10 @@ harness's independently asserted instrumented-subprocess signal, then the
 ([`scripts/check-coverage.sh`](scripts/check-coverage.sh)) after
 `make test-coverage-check` self-tests it; the profile is uploaded as the
 `coverage-profile` artifact),
-**Race Detection** (`go test -race -short ./...`), **Verify** (`go mod tidy`
+**Race Detection** (`go test -race -short ./...`), **Examples Cross-Arch
+Build** (every `_examples/` program directory `GOOS=linux GOARCH=amd64` and
+`GOOS=linux GOARCH=arm64` built, the hosted half of what `make ci` mirrors —
+core ADR-0038), **Verify** (`go mod tidy`
 leaves no diff, `go vet` over the module and the `_examples/` programs,
 `gofmt -l` empty), **Docs integrity** (`node
 scripts/check-docs.mjs` — every doc indexed in `docs/README.md`, every

@@ -1,11 +1,13 @@
 name: CI
 
 # The PR gate: the Go half mirrors `make check` (fmt, lint, test) plus the
-# race detector, a tidy/vet/gofmt verify job, and a govulncheck security
-# scan (pinned v1.7.0 — std is dependency-free, so this is the reachable
-# standard-library advisory signal every consumer inherits); docs-gate is the
-# docs-integrity check from ADR-0001. Actions are pinned by commit SHA with
-# least-privilege permissions (frostyard/core ADR-0021).
+# race detector, a tidy/vet/gofmt verify job, a cross-architecture build of
+# every _examples/ program (frostyard/core ADR-0038 — this is the hosted half
+# of what `make ci` mirrors), and a govulncheck security scan (pinned v1.7.0
+# — std is dependency-free, so this is the reachable standard-library
+# advisory signal every consumer inherits); docs-gate is the docs-integrity
+# check from ADR-0001. Actions are pinned by commit SHA with least-privilege
+# permissions (frostyard/core ADR-0021).
 #
 # The same jobs also run on the merge queue's temporary branches
 # (frostyard/core ADR-0042), so every required check reports there. No job
@@ -150,6 +152,40 @@ jobs:
 
       - name: Run tests with race detector
         run: go test -race -short ./...
+
+  examples-build:
+    name: Examples Cross-Arch Build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+
+      # `go build ./...` never reaches _examples/ (package patterns ignore a
+      # leading "_"), and building only for the runner's own GOOS/GOARCH
+      # would miss a program that only fails to cross-compile. Enumerate the
+      # package directories with the same script the Lint and Verify jobs
+      # use, and build each for every target `make ci` builds locally, so the
+      # two cannot drift (frostyard/core ADR-0038). An empty enumeration
+      # fails the script, and so this job, rather than silently building
+      # nothing.
+      - name: Cross-compile the _examples programs for linux/amd64 and linux/arm64
+        run: |
+          dirs="$(./scripts/example-dirs.sh)"
+          for dir in $dirs; do
+            for goos_goarch in linux/amd64 linux/arm64; do
+              goos="${goos_goarch%/*}"
+              goarch="${goos_goarch#*/}"
+              echo "GOOS=$goos GOARCH=$goarch go build $dir"
+              GOOS=$goos GOARCH=$goarch go build -o /dev/null "$dir"
+            done
+          done
 
   verify:
     name: Verify
