@@ -61,7 +61,7 @@ whichever agent you are:
 
 ```bash
 make check           # fmt + lint + vet + test + coverage floor — the local gate; run before every PR
-make ci              # credential-free gate mirroring CI's jobs in CI's fail-fast order: tidy diff, vet, gofmt, lint, unit test, race, cross-arch build of _examples/ (core ADR-0038)
+make ci              # canonical local gate, sequential and fail-fast: tidy diff, vet, gofmt, lint at the pin, unit+e2e tests, race, cross-arch build of _examples/ — not a mirror of the GitHub workflow (core ADR-0038)
 make verify          # credential-free, non-mutating gate (what a read-only reviewer runs): tidy diff, gofmt -l, lint at the exact pin, vet, tests
 make test            # unit + e2e; asserts subprocess coverage and writes the in-process coverage profile
 make lint            # golangci-lint run (.golangci.yml), module + _examples/
@@ -74,6 +74,23 @@ go test -v -run TestName ./reporter/   # run a single unit test
 go test -v ./tests/e2e/...             # the example-program e2e suite alone
 node scripts/check-docs.mjs            # docs-integrity gate (index, links, aliases)
 ```
+
+`make ci` is the canonical local gate core ADR-0038 requires, not a
+reproduction of [`.github/workflows/ci.yml`](.github/workflows/ci.yml). It runs
+its own checks in one shell, in the order listed above, stopping at the first
+failure; the workflow's jobs declare no `needs:` and run in parallel, so there
+is no CI ordering to mirror. The two are deliberately not the same set:
+
+- **GitHub only** — the Security Scan job (`govulncheck` over the module and
+  the `_examples/` programs), the Docs integrity job
+  (`node scripts/check-docs.mjs`), and the Release config job (the goreleaser
+  configuration check) have no step in `make ci`. Run
+  `node scripts/check-docs.mjs` yourself after a docs change.
+- **`make ci` only** — the cross-architecture build of every `_examples/`
+  program for `linux/amd64` and `linux/arm64`.
+- **Coverage floor** — the workflow's Unit Tests job runs
+  `make test-coverage-check` and `make coverage-check` on top of the test run;
+  `make ci` does not. Locally that floor belongs to `make check`.
 
 `make check` runs `gofmt -w` first, so it may modify files — commit the
 result. `go test ./...` deliberately excludes `_examples/` (underscore

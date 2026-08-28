@@ -109,7 +109,18 @@ verify:
 ## check: Run fmt, lint, vet, test, and the coverage floor
 check: fmt lint vet test test-coverage-check coverage-check
 
-## ci: Credential-free gate mirroring CI's jobs in CI's fail-fast order: tidy diff, vet, gofmt, lint, unit test, race, cross-arch build of _examples/ (core ADR-0038)
+# `ci` is this repository's canonical local gate (core ADR-0038), not a
+# reproduction of the GitHub Actions workflow. It runs the checks below
+# sequentially and stops at the first failure; the workflow's jobs declare no
+# `needs:` and run in parallel, so there is no CI ordering for this target to
+# mirror. Three workflow jobs have no counterpart here — Security Scan
+# (govulncheck), Docs integrity (`node scripts/check-docs.mjs`), and Release
+# config (goreleaser) — and the workflow's Unit Tests job additionally enforces
+# the 95% coverage floor, which `make check` runs locally. The cross-
+# architecture `_examples/` build below runs only here. Keep this comment, the
+# `## ci` help line, AGENTS.md's Commands block, and docs/org-adrs.md's
+# ADR-0038 entry saying the same thing.
+## ci: Canonical local gate, sequential and fail-fast — tidy diff, vet, gofmt, lint at the pin, unit+e2e tests, race, cross-arch build of _examples/. Not a mirror of the GitHub workflow (Security Scan, Docs integrity, Release config, and the coverage floor are not run here; the cross-arch example build runs only here) (core ADR-0038)
 ci:
 	@echo "==> ci: go.mod is tidy"
 	@$(MAKE) --no-print-directory tidy-diff
