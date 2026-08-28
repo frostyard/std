@@ -104,12 +104,12 @@ Step 1/3: Validating source data...
   Found 100 records to migrate
 
 Step 2/3: Migrating records...
-  20% — batch 1 of 5 complete
-  40% — batch 2 of 5 complete
+  batch 1 of 5 complete
+  batch 2 of 5 complete
+  batch 3 of 5 complete
 Warning: 3 records skipped (missing required field)
-  60% — batch 3 of 5 complete
-  80% — batch 4 of 5 complete
-  100% — batch 5 of 5 complete
+  batch 4 of 5 complete
+  batch 5 of 5 complete
 
 Step 3/3: Verifying migration...
   97 records verified
