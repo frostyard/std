@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"io"
 	"math"
 	"strconv"
 	"strings"
@@ -415,5 +416,35 @@ func TestJSONReporter_IsJSON(t *testing.T) {
 
 	if !r.IsJSON() {
 		t.Error("JSONReporter.IsJSON() = false, want true")
+	}
+}
+
+func TestJSONReporter_TypedNilWriterIsSilent(t *testing.T) {
+	before := typedNilWrites.Load()
+
+	// A nil *nilRecordingWriter stored in an io.Writer is a typed nil: the
+	// interface is non-nil (staticcheck's SA4023 rejects comparing it to nil
+	// as never true), so the constructor cannot catch it with w == nil.
+	var w *nilRecordingWriter
+	var iface io.Writer = w
+
+	exerciseReporter(NewJSONReporter(iface))
+
+	if got := typedNilWrites.Load() - before; got != 0 {
+		t.Errorf("typed-nil writer received %d writes, want 0", got)
+	}
+}
+
+func TestJSONReporter_NonNilPointerWriterUnchanged(t *testing.T) {
+	w := &nilRecordingWriter{}
+
+	NewJSONReporter(w).Message("hello")
+
+	var event ProgressEvent
+	if err := json.Unmarshal(w.buf.Bytes(), &event); err != nil {
+		t.Fatalf("unmarshal event from non-nil writer: %v", err)
+	}
+	if event.Message != "hello" {
+		t.Errorf("event.Message = %q, want %q", event.Message, "hello")
 	}
 }

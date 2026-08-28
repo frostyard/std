@@ -89,7 +89,7 @@ EventTypeComplete = "complete"
 Human-readable formatted output to an `io.Writer`.
 
 - **Constructor:** `NewTextReporter(w io.Writer) *TextReporter`
-- **Nil writer:** treated as `io.Discard`; all reporting methods remain silent and non-panicking
+- **Nil writer:** treated as `io.Discard`; all reporting methods remain silent and non-panicking. Both nil forms normalize: a literal `nil` `io.Writer` and an `io.Writer` holding a nil concrete value (a typed nil such as `(*bytes.Buffer)(nil)`, or a nil map/slice/func/chan writer), which is not `== nil` and would otherwise panic inside the concrete `Write`. Writers whose kind cannot be nil (a struct value) are passed through unchanged. The shared normalization is `discardIfNil` in `reporter/reporter.go`
 - **Thread-safe:** No
 - **IsJSON():** `false`
 
@@ -109,7 +109,7 @@ Human-readable formatted output to an `io.Writer`.
 JSON Lines output (one `ProgressEvent` per line) to an `io.Writer`.
 
 - **Constructor:** `NewJSONReporter(w io.Writer) *JSONReporter`
-- **Nil writer:** treated as `io.Discard`; all reporting methods remain silent and non-panicking
+- **Nil writer:** treated as `io.Discard`; all reporting methods remain silent and non-panicking. Both nil forms normalize: a literal `nil` `io.Writer` and an `io.Writer` holding a nil concrete value (a typed nil such as `(*bytes.Buffer)(nil)`, or a nil map/slice/func/chan writer), which is not `== nil` and would otherwise panic inside the concrete `Write`. Writers whose kind cannot be nil (a struct value) are passed through unchanged. The shared normalization is `discardIfNil` in `reporter/reporter.go`
 - **Thread-safe:** Yes — `sync.Mutex` protects all `emit()` calls
 - **IsJSON():** `true`
 

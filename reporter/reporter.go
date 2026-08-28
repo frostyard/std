@@ -2,6 +2,11 @@
 // JSON Lines, and no-op implementations.
 package reporter
 
+import (
+	"io"
+	"reflect"
+)
+
 // Reporter is the interface for reporting progress and messages.
 // It has three implementations:
 //   - TextReporter: human-readable text output
@@ -24,4 +29,32 @@ type Reporter interface {
 	Error(err error, message string)
 	Complete(message string, details any)
 	IsJSON() bool
+}
+
+// discardIfNil normalizes a writer a caller cannot have meant to write to
+// into io.Discard, so both reporter constructors share one contract.
+//
+// Two distinct values mean "no writer". A literal nil io.Writer is nil at
+// the interface level and is caught by the plain comparison. An io.Writer
+// holding a nil concrete value — a typed nil such as (*bytes.Buffer)(nil) or
+// a nil map/slice/func/chan-based writer — is *not* equal to nil, so the
+// comparison alone lets it through and the first report panics inside the
+// concrete Write method. Both arise from the same caller mistake (a
+// zero-valued writer variable passed straight to the constructor), so both
+// are normalized here and reporting stays silent and non-panicking.
+//
+// Only the kinds reflect.Value.IsNil accepts are inspected; any other kind
+// (a struct value implementing io.Writer, for example) cannot be nil and is
+// returned unchanged.
+func discardIfNil(w io.Writer) io.Writer {
+	if w == nil {
+		return io.Discard
+	}
+	switch v := reflect.ValueOf(w); v.Kind() {
+	case reflect.Chan, reflect.Func, reflect.Map, reflect.Pointer, reflect.Slice:
+		if v.IsNil() {
+			return io.Discard
+		}
+	}
+	return w
 }

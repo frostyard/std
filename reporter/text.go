@@ -11,13 +11,11 @@ type TextReporter struct {
 	stepped bool // true after the first Step call
 }
 
-// NewTextReporter returns a TextReporter that writes to w. A nil writer is
+// NewTextReporter returns a TextReporter that writes to w. A nil writer —
+// either a literal nil or an io.Writer holding a nil concrete value — is
 // treated as io.Discard so reporting remains silent and non-panicking.
 func NewTextReporter(w io.Writer) *TextReporter {
-	if w == nil {
-		w = io.Discard
-	}
-	return &TextReporter{w: w}
+	return &TextReporter{w: discardIfNil(w)}
 }
 
 func (r *TextReporter) Step(step, total int, name string) {

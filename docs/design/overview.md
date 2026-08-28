@@ -83,6 +83,7 @@ Callers using concurrent goroutines must use `JSONReporter` or `NoopReporter`.
 
 - `NewTextReporter(w io.Writer) *TextReporter` — a nil writer is normalized to `io.Discard`, keeping reporting silent and non-panicking
 - `NewJSONReporter(w io.Writer) *JSONReporter` — a nil writer is normalized to `io.Discard`, keeping reporting silent and non-panicking
+- Both constructors share one normalization, `discardIfNil` in `reporter/reporter.go`, so "nil writer" means the same thing for either implementation. It covers both nil forms: a literal `nil` `io.Writer`, and an `io.Writer` holding a nil concrete value — a typed nil such as `(*bytes.Buffer)(nil)`, or a nil map/slice/func/chan writer. A typed nil is *not* `== nil`, so a plain comparison lets it through and the first report panics inside the concrete `Write` method; `discardIfNil` uses `reflect` (stdlib) to inspect only the kinds `reflect.Value.IsNil` accepts and returns any other kind — a struct value implementing `io.Writer`, for example — unchanged. See [reporter-package.md](../specs/reporter-package.md#implementations)
 - `NoopReporter` — zero-value struct, no constructor needed (`NoopReporter{}`)
 
 ### Zero external dependencies
