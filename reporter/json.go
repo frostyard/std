@@ -17,13 +17,11 @@ type JSONReporter struct {
 	failed  bool
 }
 
-// NewJSONReporter returns a JSONReporter that writes to w. A nil writer is
+// NewJSONReporter returns a JSONReporter that writes to w. A nil writer —
+// either a literal nil or an io.Writer holding a nil concrete value — is
 // treated as io.Discard so reporting remains silent and non-panicking.
 func NewJSONReporter(w io.Writer) *JSONReporter {
-	if w == nil {
-		w = io.Discard
-	}
-	return &JSONReporter{encoder: json.NewEncoder(w)}
+	return &JSONReporter{encoder: json.NewEncoder(discardIfNil(w))}
 }
 
 // emit stamps the event and writes it as one JSON line. When the event

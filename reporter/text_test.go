@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"io"
+	"sync/atomic"
 	"testing"
 )
 
@@ -176,3 +177,87 @@ func TestTextReporter_IsJSON(t *testing.T) {
 		t.Error("TextReporter.IsJSON() = true, want false")
 	}
 }
+
+// typedNilWrites counts Write calls that reached nilRecordingWriter through a
+// typed-nil receiver. A constructor that normalized the writer correctly
+// never lets such a call happen, so any increment is observable output from a
+// writer the caller meant to be absent.
+var typedNilWrites atomic.Int64
+
+// nilRecordingWriter is an io.Writer whose Write survives a nil receiver
+// instead of panicking, so a test can distinguish "the constructor discarded
+// the typed-nil writer" from "the write happened to be harmless".
+type nilRecordingWriter struct {
+	buf bytes.Buffer
+}
+
+func (w *nilRecordingWriter) Write(p []byte) (int, error) {
+	if w == nil {
+		typedNilWrites.Add(1)
+		return len(p), nil
+	}
+	return w.buf.Write(p)
+}
+
+// exerciseReporter calls every Reporter method once.
+func exerciseReporter(r Reporter) {
+	r.Step(1, 2, "first")
+	r.Step(2, 2, "second")
+	r.Progress(50, "halfway")
+	r.Message("item %d", 1)
+	r.MessagePlain("item %d", 2)
+	r.Warning("item %d", 3)
+	r.Error(errors.New("failed"), "item")
+	r.Complete("done", map[string]bool{"ok": true})
+}
+
+func TestTextReporter_TypedNilWriter(t *testing.T) {
+	before := typedNilWrites.Load()
+
+	// A nil *nilRecordingWriter stored in an io.Writer is a typed nil: the
+	// interface is non-nil (staticcheck's SA4023 rejects comparing it to nil
+	// as never true), so the constructor cannot catch it with w == nil.
+	var w *nilRecordingWriter
+	var iface io.Writer = w
+
+	r := NewTextReporter(iface)
+	if r.w != io.Discard {
+		t.Fatalf("NewTextReporter(typed nil) writer = %T, want io.Discard", r.w)
+	}
+
+	exerciseReporter(r)
+
+	if got := typedNilWrites.Load() - before; got != 0 {
+		t.Errorf("typed-nil writer received %d writes, want 0", got)
+	}
+}
+
+func TestTextReporter_NonNilPointerWriterUnchanged(t *testing.T) {
+	w := &nilRecordingWriter{}
+
+	r := NewTextReporter(w)
+	if r.w != io.Writer(w) {
+		t.Fatalf("NewTextReporter(non-nil) writer = %T, want the supplied writer", r.w)
+	}
+
+	r.MessagePlain("hello")
+
+	if got, want := w.buf.String(), "hello\n"; got != want {
+		t.Errorf("non-nil writer got %q, want %q", got, want)
+	}
+}
+
+func TestDiscardIfNil_NonNilableKindUnchanged(t *testing.T) {
+	// A struct value implementing io.Writer has no nil form; discardIfNil
+	// must return it untouched rather than inspect it.
+	var w structWriter
+	if got := discardIfNil(w); got != io.Writer(w) {
+		t.Errorf("discardIfNil(struct writer) = %T, want the supplied writer", got)
+	}
+}
+
+// structWriter is a non-pointer io.Writer implementation: its reflect.Kind is
+// Struct, which reflect.Value.IsNil would panic on.
+type structWriter struct{}
+
+func (structWriter) Write(p []byte) (int, error) { return len(p), nil }
