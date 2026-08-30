@@ -55,7 +55,8 @@ whichever agent you are:
   warns when the installed version differs, and fails on findings; CI
   installs the same lock through `jdx/mise-action`
 - [`svu`](https://github.com/caarlos0/svu) only for `make bump`
-- Node 20+ only for `node scripts/check-docs.mjs` (zero dependencies)
+- Node 24+ only for `node scripts/check-docs.mjs` (zero dependencies);
+  the 20.x line reached end-of-life on 2026-04-30, and 24 is the Active LTS
 
 ### Commands
 
