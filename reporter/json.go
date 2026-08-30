@@ -21,7 +21,27 @@ type JSONReporter struct {
 // either a literal nil or an io.Writer holding a nil concrete value — is
 // treated as io.Discard so reporting remains silent and non-panicking.
 func NewJSONReporter(w io.Writer) *JSONReporter {
-	return &JSONReporter{encoder: json.NewEncoder(discardIfNil(w))}
+	return &JSONReporter{encoder: json.NewEncoder(writerPanicGuard{w: discardIfNil(w)})}
+}
+
+// writerPanicGuard wraps an io.Writer and converts a panic raised by its
+// Write method into an ordinary error, so a transport failure below the JSON
+// encoder is reported through the same path as a writer that merely returns
+// an error, and cannot escape emit() as a panic. Marshaling a Details value
+// happens entirely before Write is ever called, so this guard never sees —
+// and never mislabels — a panicking json.Marshaler; that is handled by
+// encodeRecover instead.
+type writerPanicGuard struct {
+	w io.Writer
+}
+
+func (g writerPanicGuard) Write(p []byte) (n int, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			err = fmt.Errorf("reporter: writer panicked: %v", r)
+		}
+	}()
+	return g.w.Write(p)
 }
 
 // emit stamps the event and writes it as one JSON line. When the event
@@ -31,7 +51,9 @@ func NewJSONReporter(w io.Writer) *JSONReporter {
 // {"encoding_error": "<reason>"} so the line — in particular the terminal
 // `complete` event — still reaches the stream as a valid ProgressEvent. A
 // panicking Marshaler is handled the same way as one that returns an error.
-// Writer (I/O) errors are discarded: a progress stream has no channel to
+// Writer (I/O) errors — including a panic raised by the underlying
+// io.Writer's Write method, converted to an error by writerPanicGuard before
+// it reaches this method — are discarded: a progress stream has no channel to
 // report its own transport failure and must never abort the caller. After the
 // first writer error, later events are dropped so they cannot follow a partial
 // JSON record on the same stream.

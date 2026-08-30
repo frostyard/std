@@ -307,6 +307,55 @@ func TestJSONReporter_FallbackWriterErrorStopsLaterEvents(t *testing.T) {
 	}
 }
 
+func TestJSONReporter_WriterPanicIsSilent(t *testing.T) {
+	w := &panickingWriter{}
+	r := NewJSONReporter(w)
+
+	// A normal event reaches Write directly during the primary encode.
+	r.Complete("done", map[string]string{"device": "/dev/sda"})
+
+	if !r.failed {
+		t.Error("reporter did not latch primary writer panic")
+	}
+	if w.calls != 1 {
+		t.Fatalf("writer called %d times, want 1", w.calls)
+	}
+
+	r.Message("must not be attempted")
+	if w.calls != 1 {
+		t.Errorf("writer called %d times after latch, want still 1", w.calls)
+	}
+}
+
+func TestJSONReporter_FallbackWriterPanicIsSilent(t *testing.T) {
+	w := &panickingWriter{}
+	r := NewJSONReporter(w)
+
+	// Marshaling an unencodable Details value fails entirely in memory, so
+	// the primary encode never calls Write; the panic can only be observed
+	// in the fallback encode after Details is replaced.
+	r.Complete("done", func() {})
+
+	if !r.failed {
+		t.Error("reporter did not latch fallback writer panic")
+	}
+	if w.calls != 1 {
+		t.Fatalf("writer called %d times, want 1", w.calls)
+	}
+}
+
+// panickingWriter is an io.Writer whose Write always panics, simulating a
+// transport failure that surfaces as a panic (for example a closed pipe or
+// broken connection) rather than a returned error.
+type panickingWriter struct {
+	calls int
+}
+
+func (w *panickingWriter) Write([]byte) (int, error) {
+	w.calls++
+	panic("writer panicked")
+}
+
 func TestJSONReporter_NilWriterIsSilent(t *testing.T) {
 	r := NewJSONReporter(nil)
 
