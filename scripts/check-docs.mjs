@@ -3,7 +3,7 @@
 // resolution, and release-config workflow/docs consistency — thresholds in
 // .coverage-thresholds.json (std ADR-0001, pattern from frostyard/core
 // ADR-0029; the never_relax guardrail follows core ADR-0019). Zero
-// dependencies; Node >= 20. Run: node scripts/check-docs.mjs
+// dependencies; Node >= 24. Run: node scripts/check-docs.mjs
 import { readFileSync, readdirSync, lstatSync, existsSync, realpathSync } from "node:fs";
 import { join, dirname, resolve, relative, sep } from "node:path";
 
