@@ -177,6 +177,13 @@ func TestExamples(t *testing.T) {
 				if last := events[len(events)-1]; last.Type != reporter.EventTypeComplete {
 					t.Errorf("last event type = %q, want %q", last.Type, reporter.EventTypeComplete)
 				}
+				got := make([]reporter.EventType, len(events))
+				for i, ev := range events {
+					got[i] = ev.Type
+				}
+				if want := expectedEventSequence(t, name); !reflect.DeepEqual(got, want) {
+					t.Errorf("event type sequence = %v, want %v", got, want)
+				}
 			})
 
 			t.Run("text", func(t *testing.T) {
@@ -354,6 +361,67 @@ func TestDecodeEventLine(t *testing.T) {
 				t.Errorf("decodeEventLine() event = %+v, want message event", event)
 			}
 		})
+	}
+}
+
+// expectedEventSequence returns the exact JSON EventType sequence a runnable
+// example must emit, derived from its fixed fixture data in
+// _examples/<name>/main.go. A missing, extra, or reordered intermediate event
+// (Step/Progress/Message/Warning/Error) fails the calling test even when the
+// stream still ends on a complete event.
+func expectedEventSequence(t *testing.T, name string) []reporter.EventType {
+	t.Helper()
+	step, progress, message, warning, errType, complete :=
+		reporter.EventTypeStep, reporter.EventTypeProgress, reporter.EventTypeMessage,
+		reporter.EventTypeWarning, reporter.EventTypeError, reporter.EventTypeComplete
+
+	switch name {
+	case "deploy":
+		// Step 1: Message, Warning. Step 2: Message. Step 3: Message, Warning.
+		// Step 4: Message. Then Complete.
+		return []reporter.EventType{
+			step, message, warning,
+			step, message,
+			step, message, warning,
+			step, message,
+			complete,
+		}
+	case "fileprocess":
+		// document.pdf, photo.jpg, and report.docx are processed (Message,
+		// Progress); archive.tar.gz and notes.txt are skipped (Message only).
+		return []reporter.EventType{
+			step, message, progress,
+			step, message, progress,
+			step, message,
+			step, message, progress,
+			step, message,
+			complete,
+		}
+	case "healthcheck":
+		// database and cache are healthy (Message); API gateway is degraded
+		// (Warning); message queue is down (Error). MessagePlain before
+		// Complete decodes as a message event.
+		return []reporter.EventType{
+			step, message,
+			step, message,
+			step, warning,
+			step, errType,
+			message,
+			complete,
+		}
+	case "migration":
+		// Phase 1: Message. Phase 2: five batches of Progress, with a
+		// Warning after the third batch's Progress. Phase 3: Message.
+		return []reporter.EventType{
+			step, message,
+			step,
+			progress, progress, progress, warning, progress, progress,
+			step, message,
+			complete,
+		}
+	default:
+		t.Fatalf("expectedEventSequence: no fixed event sequence known for example %q", name)
+		return nil
 	}
 }
 
