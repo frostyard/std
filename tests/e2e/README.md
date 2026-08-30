@@ -9,8 +9,11 @@ coverage instrumentation and runs it as a real subprocess:
 
 - `-format json` — exit 0, nothing on stderr, every stdout line decodes into
   `reporter.ProgressEvent` with unknown fields rejected, every `type` is a
-  known `EventType`, every `timestamp` is RFC3339, and the last event is
-  `complete`;
+  known `EventType`, every `timestamp` is RFC3339, the last event is
+  `complete`, and the full decoded event-type sequence matches an exact
+  sequence derived from the example's fixed fixture data — a missing, extra,
+  or reordered intermediate `step`/`progress`/`message`/`warning`/`error`
+  event fails the run instead of passing on shape and terminal event alone;
 - `-format text` — exit 0, non-empty output whose first line is not JSON;
 - `-format noop` — exit 0, nothing on stderr, no JSON event lines, and
   strictly less output than text mode (the reporter's contribution is gone;
