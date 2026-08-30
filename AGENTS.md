@@ -86,8 +86,11 @@ is no CI ordering to mirror. The two are deliberately not the same set:
   (`node scripts/check-docs.mjs`), and the Release config job (the goreleaser
   configuration check) have no step in `make ci`. Run
   `node scripts/check-docs.mjs` yourself after a docs change.
-- **`make ci` only** — the cross-architecture build of every `_examples/`
-  program for `linux/amd64` and `linux/arm64`.
+- **Both, deliberately identical** — the cross-architecture build of every
+  `_examples/` program for `linux/amd64` and `linux/arm64` runs in `make ci`
+  *and* in the workflow's Examples Cross-Arch Build job (`examples-build`),
+  off the same [`scripts/example-dirs.sh`](scripts/example-dirs.sh)
+  enumeration, so the local gate and the hosted one cannot drift apart.
 - **Coverage floor** — the workflow's Unit Tests job runs
   `make test-coverage-check` and `make coverage-check` on top of the test run;
   `make ci` does not. Locally that floor belongs to `make check`.

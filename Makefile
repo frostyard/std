@@ -117,10 +117,13 @@ check: fmt lint vet test test-coverage-check coverage-check
 # (govulncheck), Docs integrity (`node scripts/check-docs.mjs`), and Release
 # config (goreleaser) — and the workflow's Unit Tests job additionally enforces
 # the 95% coverage floor, which `make check` runs locally. The cross-
-# architecture `_examples/` build below runs only here. Keep this comment, the
-# `## ci` help line, AGENTS.md's Commands block, and docs/org-adrs.md's
+# architecture `_examples/` build below is not exclusive to this target: the
+# workflow's Examples Cross-Arch Build job (`examples-build`) builds the same
+# programs, enumerated by the same scripts/example-dirs.sh, for the same
+# linux/amd64 and linux/arm64 pair, so the two cannot drift. Keep this comment,
+# the `## ci` help line, AGENTS.md's Commands block, and docs/org-adrs.md's
 # ADR-0038 entry saying the same thing.
-## ci: Canonical local gate, sequential and fail-fast — tidy diff, vet, gofmt, lint at the pin, unit+e2e tests, race, cross-arch build of _examples/. Not a mirror of the GitHub workflow (Security Scan, Docs integrity, Release config, and the coverage floor are not run here; the cross-arch example build runs only here) (core ADR-0038)
+## ci: Canonical local gate, sequential and fail-fast — tidy diff, vet, gofmt, lint at the pin, unit+e2e tests, race, cross-arch build of _examples/. Not a mirror of the GitHub workflow (Security Scan, Docs integrity, Release config, and the coverage floor are not run here; the cross-arch example build is also run on GitHub by the Examples Cross-Arch Build job) (core ADR-0038)
 ci:
 	@echo "==> ci: go.mod is tidy"
 	@$(MAKE) --no-print-directory tidy-diff

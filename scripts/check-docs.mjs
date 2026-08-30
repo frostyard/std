@@ -116,6 +116,30 @@ for (const wording of ["job reports on every trigger", "job succeeds without val
   }
 }
 
+// ---- 6. Cross-arch example build: the workflow job and the prose agree. ----
+// `make ci` and the workflow's Examples Cross-Arch Build job (`examples-build`)
+// build the same _examples/ programs, off the same scripts/example-dirs.sh
+// enumeration, for the same linux/amd64 and linux/arm64 pair. The job was added
+// after the prose that called that build local-only, and nothing caught the
+// contradiction for two days — so pin it here, in the style of section 5 above:
+// while the job exists, no operator-facing text may describe the build as
+// running in only one of the two places, and the entry-point design doc must
+// name the job.
+if (workflow.includes("\n  examples-build:")) {
+  const localOnly = ["runs only here", "runs only locally", "`make ci` only"];
+  for (const file of ["Makefile", "AGENTS.md", "docs/org-adrs.md"]) {
+    const text = readFileSync(join(root, file), "utf8");
+    for (const phrase of localOnly) {
+      if (text.includes(phrase)) {
+        failures.push(`cross-arch: ${file} calls the cross-arch _examples/ build local-only ("${phrase}") while .github/workflows/ci.yml runs it in the examples-build job`);
+      }
+    }
+  }
+  if (!readFileSync(join(root, "docs/design/overview.md"), "utf8").includes("Examples Cross-Arch Build")) {
+    failures.push("cross-arch: docs/design/overview.md does not name the Examples Cross-Arch Build job that .github/workflows/ci.yml defines");
+  }
+}
+
 // ---- Report against thresholds. ----
 const results = {
   docs_index_coverage: rate(docsIndexed, docsTotal),
