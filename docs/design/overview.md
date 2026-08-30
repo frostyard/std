@@ -29,7 +29,7 @@
 │   ├── plans/             # Design documents and implementation plans
 │   └── metrics.md, review-rubric.md, quality.md   # conformance aliases (ADR-0001)
 ├── .github/
-│   ├── workflows/ci.yml   # Lint, Security Scan, Unit Tests, Race Detection, Verify, Docs integrity, Release config
+│   ├── workflows/ci.yml   # Lint, Security Scan, Unit Tests, Race Detection, Examples Cross-Arch Build, Verify, Docs integrity, Release config
 │   ├── workflows/release.yml  # On tag push: changelog-only GoReleaser release
 │   ├── pull_request_template.md, ISSUE_TEMPLATE/, prompts/
 │   ├── copilot-instructions.md -> ../AGENTS.md
@@ -132,7 +132,8 @@ node scripts/check-docs.mjs   # Docs-integrity gate
 ```
 
 CI (`.github/workflows/ci.yml`) runs Lint, Security Scan, Unit Tests, Race
-Detection, Verify (tidy/vet/gofmt), Docs integrity, and Release config on every
+Detection, Examples Cross-Arch Build (the same cross-compilation `make ci` runs
+locally), Verify (tidy/vet/gofmt), Docs integrity, and Release config on every
 PR, every push to `main`, and every merge-queue branch (`merge_group`);
 the loop around it — template, rubric, gates, corrections, metric, release
 path — is described in [quality-loop.md](quality-loop.md).
