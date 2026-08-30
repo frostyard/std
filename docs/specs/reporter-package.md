@@ -102,7 +102,9 @@ Human-readable formatted output to an `io.Writer`.
 - `Error`: `"Error: message: err.Error()\n"` (if `err` is nil: `"Error: message\n"`)
 - `Complete`: message surrounded by 65-char `=` separator lines
 
-**Internal state:** `stepped bool` tracks whether `Step()` has been called, to insert blank lines between steps for readability.
+**Internal state:** `stepped bool` tracks whether `Step()` has been called, to insert blank lines between steps for readability. Each method builds its full output and sends it to the writer in a single call.
+
+**Writer failure:** errors returned by the underlying `io.Writer` (or a short write, which `io.Writer`'s contract treats as a failure) are silent to callers; the reporter latches the first writer error and makes every later reporting call a no-op, so no output can follow a partial or failed stream. This mirrors `JSONReporter`'s writer-failure handling below.
 
 ### JSONReporter (`reporter/json.go`)
 

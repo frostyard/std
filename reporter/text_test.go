@@ -261,3 +261,45 @@ func TestDiscardIfNil_NonNilableKindUnchanged(t *testing.T) {
 type structWriter struct{}
 
 func (structWriter) Write(p []byte) (int, error) { return len(p), nil }
+
+// partialFailWriter writes half of the first call's bytes and reports a
+// write error, then errors outright (with no bytes written) on any later
+// call, so a test can tell whether the reporter invoked it again.
+type partialFailWriter struct {
+	buf    bytes.Buffer
+	writes int
+}
+
+func (w *partialFailWriter) Write(p []byte) (int, error) {
+	w.writes++
+	if w.writes > 1 {
+		return 0, errors.New("write called after latch")
+	}
+	half := len(p) / 2
+	n, _ := w.buf.Write(p[:half])
+	return n, errors.New("short write")
+}
+
+func TestTextReporter_LatchesAfterWriterError(t *testing.T) {
+	w := &partialFailWriter{}
+	r := NewTextReporter(w)
+
+	r.Message("first message")
+	if w.writes != 1 {
+		t.Fatalf("writer invoked %d times after first call, want 1", w.writes)
+	}
+	before := w.buf.String()
+
+	r.Message("second message")
+	r.Step(1, 2, "ignored")
+	r.Warning("ignored")
+	r.Error(errors.New("ignored"), "ignored")
+	r.Complete("ignored", nil)
+
+	if w.writes != 1 {
+		t.Errorf("writer invoked %d times after latch, want 1", w.writes)
+	}
+	if got := w.buf.String(); got != before {
+		t.Errorf("buffer changed after latch: got %q, want %q", got, before)
+	}
+}
