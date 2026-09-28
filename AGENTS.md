@@ -215,7 +215,7 @@ std is a library: a release is a Git tag plus a GitHub release with a
 changelog — no binaries, packages, or archives.
 
 1. The operator runs `make bump` on a clean, checked `main`: it runs `make
-   check`, asks [`svu next`](.svu.yaml) for the next semantic version from
+   check`, asks [`svu next`](.svu.yml) for the next semantic version from
    the Conventional Commit history (`v0` tags, `always: true`), creates an
    annotated tag, and pushes it.
 2. The pushed tag triggers
@@ -258,7 +258,7 @@ are operator acts (see Agent limits below).
   alongside `AGENTS.md`, `.agents/skills/`, and `docs/README.md`. Deny by
   default; read, write, and run-tests allowed; issues, pull requests, and
   follow-ups review-required; `.github/workflows/**` and the release surface
-  (`.goreleaser.yaml`, `.svu.yaml`, `.github/workflows/release.yml`) are
+  (`.goreleaser.yaml`, `.svu.yml`, `.github/workflows/release.yml`) are
   review-required at high risk. Change it only alongside the matching ADR
   or design change; it must validate against core's
   `organization/schemas/v1/repository-agent-governance.schema.json`.

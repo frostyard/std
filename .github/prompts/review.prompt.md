@@ -36,7 +36,7 @@ checks, or claim verification passed without evidence from the pull request.
    [docs/design/overview.md](../../docs/design/overview.md) changed alongside
    the code, and that the `_examples/` programs still pass the e2e suite.
 5. If the diff touches `.github/workflows/**`, `.goreleaser.yaml`,
-   `.svu.yaml`, or `policies/agent-governance.json`, treat it as high risk:
+   `.svu.yml`, or `policies/agent-governance.json`, treat it as high risk:
    confirm every action is SHA-pinned with least-privilege permissions and
    that a human reviews it.
 6. Report findings as review comments ordered by severity, labelled

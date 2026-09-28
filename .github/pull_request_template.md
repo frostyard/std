@@ -35,7 +35,7 @@ closes. -->
 
 <!-- Delete if the PR touches none of these. -->
 
-- [ ] Changes under `.github/workflows/**`, `.goreleaser.yaml`, `.svu.yaml`,
+- [ ] Changes under `.github/workflows/**`, `.goreleaser.yaml`, `.svu.yml`,
       or `policies/agent-governance.json` are called out above as high risk
       (new actions SHA-pinned, least-privilege permissions)
 
