@@ -23,7 +23,7 @@ pass.
 | Docs housekeeping | `AGENTS.md`, `docs/design/overview.md`, and `docs/specs/*` reflect the behavior change; new docs start from their category `TEMPLATE.md`, are indexed in [docs/README.md](../README.md), and cross-link both ways; a new significant decision ⇒ ADR first, in the same change. |
 | Docs-integrity gate green | `node scripts/check-docs.mjs` passes: every doc indexed, every relative link resolving, every symlink alias intact (thresholds in `.coverage-thresholds.json`). |
 | Aliases untouched | Conformance aliases ([ADR-0001](../adr/0001-acmm-conformance-via-canonical-aliases.md)) are not edited directly; canonical targets are. |
-| Protected boundaries | Changes under `.github/workflows/**`, `.goreleaser.yaml`, `.svu.yaml`, or `policies/agent-governance.json` are called out as high risk and reviewed by a human (`policies/agent-governance.json`); new actions are SHA-pinned with least-privilege permissions. |
+| Protected boundaries | Changes under `.github/workflows/**`, `.goreleaser.yaml`, `.svu.yml`, or `policies/agent-governance.json` are called out as high risk and reviewed by a human (`policies/agent-governance.json`); new actions are SHA-pinned with least-privilege permissions. |
 | Conventional title | The PR title (or lone commit subject) is `type(scope): summary`, since the squash commit is what `svu` versions and the release changelog groups by. |
 | Agent limits respected | The PR was not merged, approved, released, or tagged by the agent that authored it; mechanically backed by `.claude/settings.json` and declared in `policies/agent-governance.json`. |
 

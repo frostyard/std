@@ -40,7 +40,7 @@
 ├── .memory/               # Corrections inbox (append-only corrections.jsonl)
 ├── .claude/               # settings.json (tool-layer limits), session-summary.md
 ├── .goreleaser.yaml       # builds skipped; changelog grouped by commit type
-├── .svu.yaml              # svu (semantic version utility) config for `make bump`
+├── .svu.yml               # svu (semantic version utility) config for `make bump`
 ├── .golangci.yml          # What `make lint` and CI run (v2, standard + gofmt)
 ├── .editorconfig
 ├── go.mod                 # Module: github.com/frostyard/std, Go 1.26
@@ -140,7 +140,7 @@ path — is described in [quality-loop.md](quality-loop.md).
 
 ## Release
 
-`make bump` tags the next semver (svu, `.svu.yaml`) and pushes the tag;
+`make bump` tags the next semver (svu, `.svu.yml`) and pushes the tag;
 `.github/workflows/release.yml` then runs GoReleaser Pro with
 `.goreleaser.yaml` — builds skipped, changelog grouped by Conventional Commit
 type, GitHub release under `frostyard/std` (`prerelease: auto`). Consumers
