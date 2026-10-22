@@ -140,7 +140,9 @@ path — is described in [quality-loop.md](quality-loop.md).
 
 ## Release
 
-`make bump` tags the next semver (svu, `.svu.yml`) and pushes the tag;
+`make bump` tags the next semver (svu, `.svu.yml`) and pushes the tag; it
+first refuses any svu other than the `mise.toml` pin (`make
+svu-version-check`), because svu reads `.svu.yml` only from v3 on;
 `.github/workflows/release.yml` then runs GoReleaser Pro with
 `.goreleaser.yaml` — builds skipped, changelog grouped by Conventional Commit
 type, GitHub release under `frostyard/std` (`prerelease: auto`). Consumers

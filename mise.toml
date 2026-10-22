@@ -7,3 +7,5 @@ lockfile = true
 
 [tools]
 golangci-lint = "2.13.1"
+# svu reads .svu.yml only from v3 on; `make bump` refuses any other release.
+svu = "3.4.1"

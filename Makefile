@@ -1,4 +1,4 @@
-.PHONY: all clean fmt lint lint-version-check vet verify tidy-diff gofmt-check test test-cover coverage-check test-coverage-check tidy check ci bump help
+.PHONY: all clean fmt lint lint-version-check vet verify tidy-diff gofmt-check test test-cover coverage-check test-coverage-check tidy check ci svu-version-check bump help
 
 # Go commands
 GO := go
@@ -8,6 +8,11 @@ GOFMT := gofmt
 # (jdx/mise-action), and on Snowcat workers, verified against mise.lock.
 # Bump it there in a dedicated commit; never edit this line.
 GOLANGCI_LINT_VERSION := $(strip $(shell sed -n 's/^golangci-lint = "\(.*\)"/\1/p' mise.toml))
+# Pinned svu release for `make bump`, read from mise.toml like the
+# golangci-lint pin. svu reads .svu.yml only from v3 on; an older svu on PATH
+# (for example a `go install`ed v1.x) ignores it, so bump refuses any other
+# release instead of computing a version from different rules.
+SVU_VERSION := $(strip $(shell sed -n 's/^svu = "\(.*\)"/\1/p' mise.toml))
 # The Go release this module is built with, from go.mod's toolchain line —
 # the only Go pin (mise reads the same line). golangci-lint must be built
 # with a Go at least this new, or its embedded gofmt and typechecker disagree
@@ -149,8 +154,16 @@ ci:
 	done
 	@echo "==> ci passed"
 
-## bump: Tag and push next version (requires clean tree and svu)
-bump:
+## svu-version-check: Fail unless the svu on PATH is the mise.toml pin
+svu-version-check:
+	@test -n "$(SVU_VERSION)" || { echo "mise.toml pins no svu"; exit 1; }
+	@installed="$$(svu --version 2>/dev/null | sed -n 's/^GitVersion:[[:space:]]*v\{0,1\}\([^[:space:]]*\).*/\1/p')"; \
+	if [ "$$installed" != "$(SVU_VERSION)" ]; then \
+		echo "expected svu $(SVU_VERSION), found $${installed:-none or unrecognized} (run: mise install)"; exit 1; \
+	fi
+
+## bump: Tag and push next version (requires clean tree and the mise.toml svu pin)
+bump: svu-version-check
 	@$(MAKE) check
 	@if [ -n "$$(git status --porcelain)" ]; then \
 		echo "Working directory not clean. Commit or stash first."; \

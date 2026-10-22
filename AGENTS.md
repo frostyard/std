@@ -54,7 +54,10 @@ whichever agent you are:
   pin from `mise.toml`, fails with `mise install` when the binary is absent,
   warns when the installed version differs, and fails on findings; CI
   installs the same lock through `jdx/mise-action`
-- [`svu`](https://github.com/caarlos0/svu) only for `make bump`
+- [`svu`](https://github.com/caarlos0/svu) only for `make bump`, pinned in
+  `mise.toml` (3.4.1; `mise install` provides it). svu reads `.svu.yml` only
+  from v3 on, so `make bump` runs `make svu-version-check` first and refuses
+  any other release on `PATH` (an older `go install`ed svu ignores the config)
 - Node 24+ only for `node scripts/check-docs.mjs` (zero dependencies);
   the 20.x line reached end-of-life on 2026-04-30, and 24 is the Active LTS
 
@@ -70,6 +73,7 @@ make vet             # go vet, module + _examples/
 make test-cover      # coverage profile + HTML report
 make coverage-check  # enforce the 95.0% total statement-coverage floor on coverage.out
 make test-coverage-check  # self-test scripts/check-coverage.sh with fixture profiles
+make svu-version-check  # fail unless the svu on PATH is the mise.toml pin (make bump runs it first)
 make bump            # tag next semver with svu and push the tag (see Releases)
 go test -v -run TestName ./reporter/   # run a single unit test
 go test -v ./tests/e2e/...             # the example-program e2e suite alone
@@ -214,7 +218,8 @@ permissions (core ADR-0021). `make check` reproduces the Go half locally.
 std is a library: a release is a Git tag plus a GitHub release with a
 changelog — no binaries, packages, or archives.
 
-1. The operator runs `make bump` on a clean, checked `main`: it runs `make
+1. The operator runs `make bump` on a clean, checked `main`: it checks that
+   `svu` is the `mise.toml` pin (`make svu-version-check`), runs `make
    check`, asks [`svu next`](.svu.yml) for the next semantic version from
    the Conventional Commit history (`v0` tags, `always: true`), creates an
    annotated tag, and pushes it.

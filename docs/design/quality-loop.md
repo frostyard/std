@@ -142,7 +142,8 @@ analyzed without editing [ci.yml](../../.github/workflows/ci.yml) or the
 ## Release path
 
 The loop ends at a tag: the operator's `make bump` runs `make check`, asks
-`svu next` for the version, tags, and pushes; the tag triggers
+`svu next` (the `mise.toml` pin, checked by `make svu-version-check`) for the
+version, tags, and pushes; the tag triggers
 [.github/workflows/release.yml](../../.github/workflows/release.yml), a
 GoReleaser Pro run of [`.goreleaser.yaml`](../../.goreleaser.yaml) that skips
 builds and publishes a changelog-only GitHub release. Both files are a
