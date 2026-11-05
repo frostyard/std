@@ -208,15 +208,23 @@ impl Recorder {
     /// run. An inert recorder installs the hook too: it records nothing and
     /// still calls the previous hook.
     ///
-    /// The location rule is "the crate that installs the hook". The function
-    /// is `#[track_caller]`: it reads the file of its caller
-    /// ([`std::panic::Location::caller`], for example `src/main.rs` or
-    /// `src-tauri/src/main.rs`) and keeps the part before the first `src`
-    /// component as the crate root (`""` or `src-tauri/`). A panic gets a
-    /// location only in a file under `<crate root>src/`. When the caller file
-    /// is absolute, holds a `\` or a `:`, or has no `src` component, no panic
-    /// of the process gets a location. So call it directly in the app's own
-    /// crate (in `main`), not through a helper in another crate.
+    /// The location rule is "the crate that installs the hook". Call it as
+    /// `rec.install_panic_hook(env!("CARGO_MANIFEST_DIR"))` directly in the
+    /// app's own crate (in `main`), not through a helper in another crate:
+    /// `manifest_dir` is the absolute folder of the app crate that cargo
+    /// gives at compile time. The function is `#[track_caller]`: it also
+    /// reads the file of its caller ([`std::panic::Location::caller`], for
+    /// example `src/main.rs` or `src-tauri/src/main.rs`, relative to the
+    /// workspace root). The crate root is the longest prefix of that file
+    /// before a `src` folder whose components are the last components of
+    /// `manifest_dir` (`src-tauri/` for `/b/app/src-tauri`;
+    /// `src/apps/mail/` for `src/apps/mail/src/main.rs` and
+    /// `/b/ws/src/apps/mail`). When no such prefix matches, the root is `""`
+    /// only when the caller file starts with `src/` and has no other `src`
+    /// folder. A panic gets a location only in a file under
+    /// `<crate root>src/`. When the root is unknown or ambiguous (the caller
+    /// file is absolute, holds a `\` or a `:`, has no `src` folder, or no
+    /// rule above gives a root), no panic of the process gets a location.
     ///
     /// The work of this crate in the hook never panics: no unwrap, no
     /// indexing that can fail, and a poisoned lock is used as is. That
@@ -230,8 +238,8 @@ impl Recorder {
     /// Like [`std::panic::take_hook`], it panics when it is called from a
     /// panicking thread.
     #[track_caller]
-    pub fn install_panic_hook(&self) {
-        let root = crate_root(Location::caller().file());
+    pub fn install_panic_hook(&self, manifest_dir: &str) {
+        let root = crate_root(Location::caller().file(), manifest_dir);
         let prev = panic::take_hook();
         let rec = self.clone();
         panic::set_hook(Box::new(move |info| {
@@ -289,12 +297,21 @@ pub(crate) fn on_panic(
 /// app from [`Recorder::error`].
 #[cfg(any(test, target_os = "linux"))]
 pub(crate) fn error_text(err: &dyn fmt::Display) -> Option<String> {
-    panic::catch_unwind(panic::AssertUnwindSafe(|| {
+    let caught = panic::catch_unwind(panic::AssertUnwindSafe(|| {
         let mut msg = String::new();
         fmt::write(&mut msg, format_args!("{err}"))
             .ok()
             .map(|()| msg)
-    }))
-    .ok()
-    .flatten()
+    }));
+    match caught {
+        Ok(text) => text,
+        Err(payload) => {
+            // The payload is outside the catch boundary now. Its Drop can
+            // panic (a panic_any value with a panicking Drop), and that
+            // panic would unwind into the app. Leak it instead: a small leak,
+            // and only after a Display impl panicked.
+            std::mem::forget(payload);
+            None
+        }
+    }
 }

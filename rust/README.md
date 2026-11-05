@@ -32,7 +32,7 @@ fn main() {
         eprintln!("problem records are off: {why}");
     }
     // Records each panic first, then calls the hook that was there before.
-    rec.install_panic_hook();
+    rec.install_panic_hook(env!("CARGO_MANIFEST_DIR"));
 
     if let Err(e) = std::fs::read("/etc/frostmail.conf") {
         rec.error("config.load", Some(&e));
@@ -45,10 +45,13 @@ fn main() {
 - A code matches `^[a-z][a-z0-9_.]{0,63}$`; a bad code writes nothing.
 - A panic location (`src/...rs:<line>`) is kept only for the crate that
   calls `install_panic_hook`: the function reads the file of its caller
-  (for example `src-tauri/src/main.rs`, crate root `src-tauri/`) and keeps
-  only locations under `<crate root>src/`. Call it directly in the app's
-  crate. Other crates, dependencies and the standard library get no
-  location; see `map_location`.
+  (for example `src-tauri/src/main.rs`) and matches it against
+  `CARGO_MANIFEST_DIR` (for example `/b/app/src-tauri`) to find the crate
+  root (`src-tauri/`); it keeps only locations under `<crate root>src/`.
+  Call it directly in the app's crate with
+  `env!("CARGO_MANIFEST_DIR")`. Other crates, dependencies and the standard
+  library get no location, and an unknown or ambiguous root gives no
+  location at all; see `map_location`.
 - A `Display` impl that panics inside `error` gives the code as `MESSAGE`;
   `error` catches the panic and returns.
 - The crate's own work in the panic hook never panics. A previous hook that

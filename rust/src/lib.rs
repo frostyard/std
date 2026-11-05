@@ -17,7 +17,7 @@
 //! use frostyard_problems::{Component, Recorder};
 //!
 //! let rec = Recorder::new("org.frostyard.Frostmail", "2.0.1", Component::Gui);
-//! rec.install_panic_hook();
+//! rec.install_panic_hook(env!("CARGO_MANIFEST_DIR"));
 //! let err = std::io::Error::other("connection reset");
 //! rec.error("sync.imap", Some(&err));
 //! ```

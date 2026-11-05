@@ -137,7 +137,8 @@ in.component: gui
 in.runtime: rust
 in.class: panic
 in.message: called `Option::unwrap()` on a `None` value
-in.crate_root:
+in.caller_file: src/main.rs
+in.manifest_dir: /b/app
 in.location: src/sync/imap.rs:214
 journal.MESSAGE_ID: 8915bdd215c84cbab0c31c05a1a33e7e
 journal.PRIORITY: 2
@@ -212,7 +213,7 @@ payload.class: error
 payload.code: store.open
 expect: ok
 
-# The hook was installed from src-tauri/src/main.rs, so the crate root is src-tauri/: a file of that crate maps to the part from its src folder.
+# The hook was installed from src-tauri/src/main.rs with CARGO_MANIFEST_DIR /b/app/src-tauri, so the crate root is src-tauri/: a file of that crate maps to the part from its src folder.
 vector: rust-panic-src-tauri
 type: write
 in.app_id: org.frostyard.Frostread
@@ -221,7 +222,8 @@ in.component: gui
 in.runtime: rust
 in.class: panic
 in.message: index out of bounds: the len is 3 but the index is 7
-in.crate_root: src-tauri/
+in.caller_file: src-tauri/src/main.rs
+in.manifest_dir: /b/app/src-tauri
 in.location: src-tauri/src/bridge.rs:88
 journal.MESSAGE_ID: 8915bdd215c84cbab0c31c05a1a33e7e
 journal.PRIORITY: 2
@@ -250,7 +252,8 @@ in.component: gui
 in.runtime: rust
 in.class: panic
 in.message: invalid type: map, expected a string
-in.crate_root:
+in.caller_file: src/main.rs
+in.manifest_dir: /b/app
 in.location: /home/u/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.219/src/de/mod.rs:120
 journal.MESSAGE_ID: 8915bdd215c84cbab0c31c05a1a33e7e
 journal.PRIORITY: 2
@@ -277,7 +280,8 @@ in.component: gui
 in.runtime: rust
 in.class: panic
 in.message: called `Option::unwrap()` on a `None` value
-in.crate_root:
+in.caller_file: src/main.rs
+in.manifest_dir: /b/app
 in.location: /rustc/17067e9ac6d7e98f18d4d3a5b4ea0dcd2e1e8a3a/library/core/src/option.rs:2000
 journal.MESSAGE_ID: 8915bdd215c84cbab0c31c05a1a33e7e
 journal.PRIORITY: 2
@@ -304,7 +308,8 @@ in.component: gui
 in.runtime: rust
 in.class: panic
 in.message: boom
-in.crate_root:
+in.caller_file: src/main.rs
+in.manifest_dir: /b/app
 in.location: serde-1.0.219/src/de.rs:10
 journal.MESSAGE_ID: 8915bdd215c84cbab0c31c05a1a33e7e
 journal.PRIORITY: 2
@@ -331,7 +336,8 @@ in.component: gui
 in.runtime: rust
 in.class: panic
 in.message: boom
-in.crate_root:
+in.caller_file: src/main.rs
+in.manifest_dir: /b/app
 in.location: vendor/serde/src/de.rs:10
 journal.MESSAGE_ID: 8915bdd215c84cbab0c31c05a1a33e7e
 journal.PRIORITY: 2
@@ -358,7 +364,8 @@ in.component: gui
 in.runtime: rust
 in.class: panic
 in.message: boom
-in.crate_root:
+in.caller_file: src/main.rs
+in.manifest_dir: /b/app
 in.location: library/core/src/option.rs:10
 journal.MESSAGE_ID: 8915bdd215c84cbab0c31c05a1a33e7e
 journal.PRIORITY: 2
@@ -385,7 +392,8 @@ in.component: gui
 in.runtime: rust
 in.class: panic
 in.message: boom
-in.crate_root:
+in.caller_file: src/main.rs
+in.manifest_dir: /b/app
 in.location: src-tauri/src/bridge.rs:88
 journal.MESSAGE_ID: 8915bdd215c84cbab0c31c05a1a33e7e
 journal.PRIORITY: 2
@@ -412,8 +420,67 @@ in.component: gui
 in.runtime: rust
 in.class: panic
 in.message: boom
-in.crate_root: src-tauri/
+in.caller_file: src-tauri/src/main.rs
+in.manifest_dir: /b/app/src-tauri
 in.location: src/main.rs:5
+journal.MESSAGE_ID: 8915bdd215c84cbab0c31c05a1a33e7e
+journal.PRIORITY: 2
+journal.MESSAGE: boom
+journal.FROSTYARD_SCHEMA: frostyard.problem/1
+journal.FROSTYARD_APP_ID: org.frostyard.Frostmail
+journal.FROSTYARD_APP_VERSION: 2.0.1
+journal.FROSTYARD_RUNTIME: rust
+journal.FROSTYARD_COMPONENT: gui
+journal.FROSTYARD_CLASS: panic
+payload.app_id: org.frostyard.Frostmail
+payload.app_version: 2.0.1
+payload.runtime: rust
+payload.component: gui
+payload.class: panic
+expect: ok
+
+# A workspace member under an earlier src folder: CARGO_MANIFEST_DIR selects the root src/apps/mail/, and its file maps to src/sync.rs.
+vector: rust-panic-nested-member
+type: write
+in.app_id: org.frostyard.Frostmail
+in.version: 2.0.1
+in.component: gui
+in.runtime: rust
+in.class: panic
+in.message: boom
+in.caller_file: src/apps/mail/src/main.rs
+in.manifest_dir: /b/ws/src/apps/mail
+in.location: src/apps/mail/src/sync.rs:10
+journal.MESSAGE_ID: 8915bdd215c84cbab0c31c05a1a33e7e
+journal.PRIORITY: 2
+journal.MESSAGE: boom
+journal.FROSTYARD_SCHEMA: frostyard.problem/1
+journal.FROSTYARD_APP_ID: org.frostyard.Frostmail
+journal.FROSTYARD_APP_VERSION: 2.0.1
+journal.FROSTYARD_RUNTIME: rust
+journal.FROSTYARD_COMPONENT: gui
+journal.FROSTYARD_CLASS: panic
+journal.FROSTYARD_LOCATION: src/sync.rs:10
+payload.app_id: org.frostyard.Frostmail
+payload.app_version: 2.0.1
+payload.runtime: rust
+payload.component: gui
+payload.class: panic
+payload.location: src/sync.rs:10
+expect: ok
+
+# A sibling crate of that nested member (src/libs/helper/): not under the root src/apps/mail/src/, so no FROSTYARD_LOCATION.
+vector: rust-panic-nested-sibling
+type: write
+in.app_id: org.frostyard.Frostmail
+in.version: 2.0.1
+in.component: gui
+in.runtime: rust
+in.class: panic
+in.message: boom
+in.caller_file: src/apps/mail/src/main.rs
+in.manifest_dir: /b/ws/src/apps/mail
+in.location: src/libs/helper/src/lib.rs:10
 journal.MESSAGE_ID: 8915bdd215c84cbab0c31c05a1a33e7e
 journal.PRIORITY: 2
 journal.MESSAGE: boom

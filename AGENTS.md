@@ -200,13 +200,17 @@ cargo command runs `--locked`.
 - **API** — `Recorder::new(app_id, version, component)` (inert on a bad
   identity, `err()` says why), `with_socket`, `error(code, Option<&dyn
   Display>)` (formats `err` only when it can write, on Linux, inside
-  `catch_unwind`: a panicking `Display` gives the code as `MESSAGE`),
-  `install_panic_hook()` (`#[track_caller]`; records the panic FIRST, THEN
+  `catch_unwind`: a panicking `Display` gives the code as `MESSAGE`, and
+  the panic payload is leaked, not dropped),
+  `install_panic_hook(env!("CARGO_MANIFEST_DIR"))` (`#[track_caller]`;
+  records the panic FIRST, THEN
   calls the previous hook; the crate's own work in the hook never panics,
   but a previous hook that panics or blocks is outside that guarantee),
   `map_location(crate_root, file, line)` (the "crate that installs the
-  hook" rule: only files under `<crate_root>src/`, where the root comes
-  from the caller file of `install_panic_hook`), `validate` (the rules of Go
+  hook" rule: only files under `<crate_root>src/`; the root is the longest
+  prefix of the caller file before a `src` folder that ends
+  `CARGO_MANIFEST_DIR`, else `""` only for a caller file with `src/` as its
+  only `src` folder, else none), `validate` (the rules of Go
   `Validate`, frames included), `decode_entry`.
 - **Transport** — 1 `send_to` on a new non-blocking
   `UnixDatagram::unbound()` on Linux; every error drops the record; the

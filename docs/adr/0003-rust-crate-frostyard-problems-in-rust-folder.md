@@ -62,15 +62,24 @@ section "Rust crate" of [specs/problems-package.md](../specs/problems-package.md
 - **A panicking `Display` does not unwind out of `error`.** `error` formats
   the error text only when it can write a record (on Linux, after the
   identity and code checks), inside `std::panic::catch_unwind`; a `Display`
-  impl that fails or panics gives the code as `MESSAGE`. With
+  impl that fails or panics gives the code as `MESSAGE`. The payload of the
+  caught panic is leaked (`std::mem::forget`), not dropped: its `Drop` can
+  panic outside the catch boundary (a `panic_any` value). With
   `panic = "abort"` such a panic still aborts (the installed hook records
   it first).
 - **"The crate that installs the hook" location rule.**
-  `install_panic_hook` is `#[track_caller]`: it reads the file of its caller
-  (`src/main.rs`, `src-tauri/src/main.rs`) and keeps the relative prefix
-  before the first `src` folder as the crate root (`""`, `src-tauri/`). A
-  caller file that is absolute, holds a `\` or a `:`, or has no `src`
-  folder gives no root, and then no panic of the process gets a location.
+  The app calls `rec.install_panic_hook(env!("CARGO_MANIFEST_DIR"))` in its
+  own crate. The function is `#[track_caller]`: it reads the file of its
+  caller (`src/main.rs`, `src-tauri/src/main.rs`, relative to the
+  workspace root) and takes the crate root from 2 facts of the build: the
+  candidates are the prefixes of that file before each `src` folder, and
+  the root is the longest non-empty candidate whose components are the last
+  components of the absolute `CARGO_MANIFEST_DIR` (`src-tauri/` for
+  `/b/app/src-tauri`, `src/apps/mail/` for a member at
+  `/b/ws/src/apps/mail`). When none matches, the root is `""` only when
+  `""` is the only candidate (`src/main.rs`). Any other case (an absolute
+  caller file, no `src` folder, no match, more than 1 candidate) gives no
+  root, and then no panic of the process gets a location.
   `map_location(crate_root, file, line)` keeps a location only when `file`
   is relative and starts exactly with `<crate_root>src/`, and the result
   `src/<rest>:<line>` matches the v1 location pattern (128 bytes at most):
@@ -111,9 +120,11 @@ section "Rust crate" of [specs/problems-package.md](../specs/problems-package.md
   and neither has a panic in a file of the app's crate outside its `src`
   folder (`build.rs`, `tests/`). A path remapping (`--remap-path-prefix`,
   `trim-paths`) that makes the app's own paths absolute or changes their
-  prefix gives no location for any panic. An app must call
-  `install_panic_hook` directly in its own crate; called through a helper in
-  another crate, it takes the root of that crate.
+  prefix gives no location for any panic, and so does a `CARGO_MANIFEST_DIR`
+  that does not end with the crate's folder when the caller file has more
+  than 1 candidate. An app must call `install_panic_hook` directly in its
+  own crate with its own `env!("CARGO_MANIFEST_DIR")`; called through a
+  helper in another crate, it takes the root of that crate.
 - The hook covers every thread, but a library that sets its own hook later
   without calling the previous hook removes it. A panic inside a panic hook
   aborts with no record, and a fatal signal (for example a crash in C code)
@@ -137,6 +148,11 @@ section "Rust crate" of [specs/problems-package.md](../specs/problems-package.md
   cross-review found that it let `vendor/serde/src/...` and
   `library/core/src/...` through; a rule that names the app's crate root
   exactly fails closed instead.
+- **The prefix before the first `src` folder of the caller file as the
+  root, with no build metadata:** a re-review found that a member under an
+  earlier `src` folder (`src/apps/mail/src/main.rs`) got the root `""`, so
+  a sibling crate (`src/libs/helper/src/...`) got locations. The
+  `CARGO_MANIFEST_DIR` of the app selects the right prefix.
 - **Send the full panic path, or the frames of a backtrace:** paths hold
   user names and dependency details; the v1 schema allows only
   `src/...rs:<line>` for Rust.

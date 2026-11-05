@@ -5,25 +5,87 @@ use crate::location::crate_root;
 use crate::map_location;
 
 #[test]
-fn root_from_the_caller_file() {
+fn root_from_the_caller_file_and_manifest_dir() {
     let cases = [
-        ("src/main.rs", Some("")),
-        ("src-tauri/src/main.rs", Some("src-tauri/")),
-        ("src/bin/x.rs", Some("")),
-        ("crates/app/src/main.rs", Some("crates/app/")),
-        ("src/a/src/b.rs", Some("")),
-        ("/abs/src/main.rs", None),
-        ("/rustc/abc/library/std/src/panicking.rs", None),
-        ("examples/x.rs", None),
-        ("build.rs", None),
-        ("src", None),
-        ("src\\main.rs", None),
-        ("C:/app/src/main.rs", None),
-        ("", None),
+        ("src/main.rs", "/b/ws", Some("")),
+        ("src/main.rs", "/b/ws/", Some("")),
+        ("src/bin/x.rs", "/b/ws", Some("")),
+        (
+            "src-tauri/src/main.rs",
+            "/b/app/src-tauri",
+            Some("src-tauri/"),
+        ),
+        (
+            "src-tauri/src/main.rs",
+            "/b/app/src-tauri/",
+            Some("src-tauri/"),
+        ),
+        (
+            "crates/app/src/main.rs",
+            "/b/ws/crates/app",
+            Some("crates/app/"),
+        ),
+        (
+            "src/apps/mail/src/main.rs",
+            "/b/ws/src/apps/mail",
+            Some("src/apps/mail/"),
+        ),
+        // Nested src folders: the longest matching candidate wins.
+        ("a/src/b/src/main.rs", "/b/ws/a/src/b", Some("a/src/b/")),
+        ("a/src/b/src/main.rs", "/b/ws/a", Some("a/")),
+        // No match and more than 1 candidate: ambiguous.
+        ("src/apps/mail/src/main.rs", "/b/other", None),
+        ("src/a/src/b.rs", "/b/ws", None),
+        // No match, and the only candidate is not "": unknown.
+        ("src-tauri/src/main.rs", "/b/app/xsrc-tauri", None),
+        ("crates/app/src/main.rs", "/b/ws/other/app", None),
+        // An empty or relative manifest_dir matches nothing.
+        ("src-tauri/src/main.rs", "", None),
+        ("src-tauri/src/main.rs", "app/src-tauri", None),
+        ("src-tauri/src/main.rs", "src-tauri", None),
+        ("src/main.rs", "", Some("")),
+        // Caller files that give no root.
+        ("/abs/src/main.rs", "/abs", None),
+        ("/rustc/abc/library/std/src/panicking.rs", "/b/ws", None),
+        ("examples/x.rs", "/b/ws", None),
+        ("build.rs", "/b/ws", None),
+        ("src", "/b/ws", None),
+        ("src\\main.rs", "/b/ws", None),
+        ("C:/app/src/main.rs", "/b/ws", None),
+        ("", "/b/ws", None),
     ];
-    for (file, want) in cases {
-        assert_eq!(crate_root(file).as_deref(), want, "crate_root({file:?})");
+    for (file, dir, want) in cases {
+        assert_eq!(
+            crate_root(file, dir).as_deref(),
+            want,
+            "crate_root({file:?}, {dir:?})"
+        );
     }
+}
+
+#[test]
+fn nested_member_maps_only_its_own_files() {
+    let root = crate_root("src/apps/mail/src/main.rs", "/b/ws/src/apps/mail");
+    let root = root.as_deref().expect("a root");
+    assert_eq!(
+        map_location(root, "src/apps/mail/src/sync.rs", 10).as_deref(),
+        Some("src/sync.rs:10")
+    );
+    assert_eq!(map_location(root, "src/libs/helper/src/lib.rs", 10), None);
+    assert_eq!(map_location(root, "src/main.rs", 10), None);
+}
+
+#[test]
+fn unmatched_single_candidate_maps_nothing() {
+    // The only candidate src-tauri/ does not match the manifest folder, so
+    // there is no root, and then no file gets a location.
+    assert_eq!(
+        crate_root("src-tauri/src/main.rs", "/b/app/xsrc-tauri"),
+        None
+    );
+    // With the root "" (a fallback that this rule does not give), a file of
+    // src-tauri/ would still not map, because it does not start with src/.
+    assert_eq!(map_location("", "src-tauri/src/x.rs", 1), None);
 }
 
 #[test]

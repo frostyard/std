@@ -159,6 +159,36 @@ fn panicking_display_gives_the_code() {
     assert_eq!(cap.field(0, "MESSAGE").as_deref(), Some("x.y"));
 }
 
+/// A panic payload whose Drop panics.
+pub(super) struct Bomb;
+
+impl Drop for Bomb {
+    fn drop(&mut self) {
+        panic!("bomb drop")
+    }
+}
+
+/// A Display impl that panics with a [`Bomb`] payload.
+pub(super) struct BombDisplay;
+
+impl fmt::Display for BombDisplay {
+    fn fmt(&self, _: &mut fmt::Formatter<'_>) -> fmt::Result {
+        std::panic::panic_any(Bomb)
+    }
+}
+
+#[test]
+fn panic_payload_with_panicking_drop_gives_the_code() {
+    let _guard = send_guard();
+    let cap = Capture::new();
+    assert_eq!(
+        nsl().record_error("x.y", Some(&BombDisplay), &cap.send()),
+        Status::Sent
+    );
+    assert_eq!(cap.len(), 1);
+    assert_eq!(cap.field(0, "MESSAGE").as_deref(), Some("x.y"));
+}
+
 #[test]
 fn message_is_cut_on_a_char_boundary() {
     let _guard = send_guard();
@@ -348,6 +378,24 @@ mod transport {
         nsl()
             .with_socket(&sock.path)
             .error("store.write", Some(&super::Panicking));
+        let got = sock.recv_all();
+        assert_eq!(got.len(), 1);
+        let fields = decode_entry(&got[0]).expect("decode");
+        assert_eq!(
+            fields.get("MESSAGE").map(String::as_str),
+            Some("store.write")
+        );
+    }
+
+    /// `error()` returns normally when the panic payload of `Display` has a
+    /// `Drop` that panics, and writes 1 record with the code as `MESSAGE`.
+    #[test]
+    fn error_with_bomb_payload_returns() {
+        let _guard = send_guard();
+        let sock = TestSocket::new();
+        nsl()
+            .with_socket(&sock.path)
+            .error("store.write", Some(&super::BombDisplay));
         let got = sock.recv_all();
         assert_eq!(got.len(), 1);
         let fields = decode_entry(&got[0]).expect("decode");

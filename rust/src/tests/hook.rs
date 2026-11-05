@@ -41,7 +41,7 @@ fn helper(mode: &str) {
     };
     Recorder::new(app_id, "1.2.3", Component::Cli)
         .with_socket(socket)
-        .install_panic_hook();
+        .install_panic_hook(env!("CARGO_MANIFEST_DIR"));
     boom();
 }
 

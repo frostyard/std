@@ -165,11 +165,14 @@ errors.
 - **Rust crate.** `frostyard-problems` in `rust/` writes the same records
   with `FROSTYARD_RUNTIME=rust` and a `FROSTYARD_LOCATION` instead of
   frames. `Recorder::install_panic_hook` records each panic first and then
-  calls the previous hook. It is `#[track_caller]`: the file of its caller
-  gives the crate root (`""` or `src-tauri/`), and `map_location` keeps a
-  location only for a relative file under `<crate_root>src/`, so other
-  crates, dependencies and the standard library never get one. `error`
-  formats its error inside `catch_unwind`, only when it can write. Its matchers are hand-written ports of the Go regular
+  calls the previous hook. It is `#[track_caller]` and takes the app's
+  `env!("CARGO_MANIFEST_DIR")`: the caller file and that folder give the
+  crate root (`""`, `src-tauri/`, or `src/apps/mail/` for a nested member),
+  and `map_location` keeps a location only for a relative file under
+  `<crate_root>src/`, so other crates, dependencies and the standard
+  library never get one; an unknown or ambiguous root gives no location.
+  `error` formats its error inside `catch_unwind`, only when it can write,
+  and leaks the payload of a caught panic. Its matchers are hand-written ports of the Go regular
   expressions, and it validates Go records too (frames included), so both
   validators accept and reject the same vectors
   ([ADR-0003](../adr/0003-rust-crate-frostyard-problems-in-rust-folder.md)).

@@ -174,10 +174,24 @@ fn run_write(v: &Vector) -> Result<(), String> {
                     Some((file, line))
                 }
             };
-            // in.crate_root is the root that install_panic_hook derives from
-            // the file of its caller; absent means "".
-            let root = Some(v.text("in.crate_root"));
-            let _ = rec.record_panic(v.text("in.message"), root, location, &send_datagram);
+            // The root as install_panic_hook derives it: from the file of
+            // its caller and the CARGO_MANIFEST_DIR of the app.
+            let root = match (v.get("in.caller_file"), v.get("in.manifest_dir")) {
+                (Some(file), Some(dir)) => crate::location::crate_root(file, dir),
+                (None, None) if location.is_none() => None,
+                _ => {
+                    return Err(
+                        "a Rust panic vector with in.location needs in.caller_file and in.manifest_dir"
+                            .to_owned(),
+                    );
+                }
+            };
+            let _ = rec.record_panic(
+                v.text("in.message"),
+                root.as_deref(),
+                location,
+                &send_datagram,
+            );
         }
         class => return Err(format!("bad in.class {class:?}")),
     }
