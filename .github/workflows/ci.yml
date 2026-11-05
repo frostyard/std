@@ -113,12 +113,13 @@ jobs:
           go-version-file: go.mod
 
       # Unit tests plus tests/e2e. The profile and floor below cover reporter
-      # code executed in the go test processes. The e2e harness separately
+      # and problems code executed in the go test processes (one total
+      # floor over both packages). The e2e harness separately
       # builds coverage-instrumented _examples/ binaries, gives every
       # subprocess a project-local GOCOVERDIR, and fails unless their covdata
       # reports covered reporter statements.
       - name: Run tests with coverage
-        run: go test -v -coverprofile=coverage.out -covermode=atomic -coverpkg=github.com/frostyard/std/reporter ./...
+        run: go test -v -coverprofile=coverage.out -covermode=atomic -coverpkg=github.com/frostyard/std/reporter,github.com/frostyard/std/problems ./...
 
       # The floor cannot be lowered without a commit: scripts/check-coverage.sh
       # defaults to 95.0 and the self-test pins the script's own behaviour, so

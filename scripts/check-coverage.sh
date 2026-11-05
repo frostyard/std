@@ -1,8 +1,11 @@
 #!/bin/sh
 # Enforce a total statement-coverage floor on a Go coverage profile.
 # Ported from frostyard/clix (scripts/check-coverage.sh), itself ported from
-# frostyard/updex. std floors the reporter package at 95.0%
-# (`make coverage-check`); observed coverage is 97.7%.
+# frostyard/updex. std floors the in-process total of the reporter and
+# problems packages (the `-coverpkg` list of `make test` and the CI Unit
+# Tests job) at 95.0% (`make coverage-check`). The floor applies to the
+# total, not to each package: a package far above it can hide one below it,
+# so read the per-package lines of `go tool cover -func` too.
 #
 # Usage: scripts/check-coverage.sh [profile] [minimum-percent]
 #

@@ -2,10 +2,12 @@
 
 `github.com/frostyard/std` is a Go standard library module for the Frostyard
 project. It provides shared packages with **zero external dependencies**
-(stdlib only). Currently it contains the `reporter` package. Start at
+(stdlib only). It contains 2 packages: `reporter` (progress reporting) and
+`problems` (problem records in the local systemd journal). Start at
 [docs/README.md](docs/README.md); read
-[docs/design/overview.md](docs/design/overview.md) and
-[docs/specs/reporter-package.md](docs/specs/reporter-package.md) for codebase
+[docs/design/overview.md](docs/design/overview.md),
+[docs/specs/reporter-package.md](docs/specs/reporter-package.md) and
+[docs/specs/problems-package.md](docs/specs/problems-package.md) for codebase
 context before performing tasks.
 
 This file (`AGENTS.md`) is the CANONICAL agent instructions **and** the
@@ -106,9 +108,10 @@ directories are invisible to package patterns); the e2e suite in
 [tests/e2e/](tests/e2e/README.md) builds those programs with Go coverage
 instrumentation, runs them with a project-local `GOCOVERDIR`, and fails unless
 the resulting covdata reports covered `reporter` statements. That subprocess
-signal is separate from `coverage.out`, whose 95% floor covers code executed
-inside the `go test` processes. The same package-pattern blind spot applies to
-the analyzers, so `make lint`,
+signal is separate from `coverage.out`, whose 95% floor covers `reporter` and
+`problems` code executed inside the `go test` processes (one total over both
+packages, the `-coverpkg` list of `make test` and the CI Unit Tests job).
+The same package-pattern blind spot applies to the analyzers, so `make lint`,
 `make vet`, and the CI Lint and Verify jobs each run a second pass over the
 example package directories named explicitly;
 [`scripts/example-dirs.sh`](scripts/example-dirs.sh) enumerates them (and
@@ -140,13 +143,41 @@ The `_examples/` programs (`deploy`, `fileprocess`, `healthcheck`,
 `migration`) each take `-format text|json|noop` and exercise the whole
 interface; they double as the e2e fixtures.
 
+### problems package
+
+Writes problem records (panics and coded errors) of a frostyard app to the
+local systemd journal and reads them back (chairlift uses the reader). It
+implements the writer and reader side of
+[core `docs/specs/problem-report.md`](https://github.com/frostyard/core/blob/main/docs/specs/problem-report.md)
+(S8 `app_problem`, the journal record registry); the decision is
+[ADR-0002](docs/adr/0002-problems-package-writes-to-the-journal-only.md) and
+the contract is [docs/specs/problems-package.md](docs/specs/problems-package.md).
+
+- **Recorder** — `New(appID, version, component, opts...)` never fails; a bad
+  identity makes it inert (`Err()` says why). `Error(code, err)` records a
+  coded error; `defer r.RecoverPanic()` records a panic of its goroutine and
+  panics again; `CrashOutput()` covers other goroutines and fatal errors
+  through `runtime/debug.SetCrashOutput` at the next start.
+- **Transport** — 1 non-blocking `AF_UNIX` datagram per record, made with
+  `syscall`; every send failure drops the record silently; at most 10
+  records per process in any 60 seconds. The package never uses the network.
+- **Reader** — `Read` runs `journalctl -o json --all`; `ParseJSON` and
+  `Validate` (the one validation path) drop and count every record that
+  fails schema v1. Only journald's `_` fields are trusted.
+- The v1 patterns, allowlist and enums in `problems/problems.go` are copied
+  from core's `v1.json`; change them only with a core spec change, together
+  with the shared vectors in `problems/testdata/vectors/` (also read by the
+  Rust crate).
+- Linux only at run time: other OSes get stubs that compile and do nothing.
+
 ## Conventions
 
 - Go 1.26; use modern Go syntax (range-over-int, omitzero, etc.)
 - **No external dependencies — stdlib only.** This is a hard constraint for
   every package in the module; the e2e suite may import only stdlib and
   `github.com/frostyard/std/...`.
-- One test file per implementation, standard `testing` package only
+- One test file per implementation (in `problems/`, per source file),
+  standard `testing` package only
 - Tests capture output via `bytes.Buffer`; JSON tests unmarshal and validate
   fields
 - Formatting is `gofmt` (enforced by `make fmt` and the `gofmt` formatter in
@@ -167,6 +198,13 @@ interface; they double as the e2e fixtures.
 
 - **Unit tests** — `reporter/*_test.go`, one file per implementation; run
   with `make test` or `go test ./reporter/`.
+- **problems tests** — `problems/*_test.go`: a `unixgram` test socket in
+  `t.TempDir()` (`WithSocket`), a replaced rate-cap clock (no sleeps),
+  subprocess runs of the test binary (`TestMain` switches on
+  `PROBLEMS_TEST_HELPER`) for real panics and crashes, a fake `journalctl`
+  script for `Read`, every vector in `problems/testdata/vectors/v1.txt`, and
+  a `GOOS=windows`/`GOOS=darwin` build (skipped with `-short`). Run with
+  `go test ./problems/`.
 - **End-to-end** — [`tests/e2e/examples_test.go`](tests/e2e/examples_test.go)
   builds every `_examples/*` program with coverage instrumentation and runs it
   as a subprocess in `json`, `text`, `noop`, and an invalid format under a

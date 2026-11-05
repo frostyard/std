@@ -55,13 +55,13 @@ vet:
 		echo "$(GO) vet $$dirs" | tr '\n' ' '; echo; \
 		$(GO) vet $$dirs || exit 1
 
-## test: Run tests, assert instrumented example-subprocess reporter coverage, and write the in-process reporter profile to coverage.out
+## test: Run tests, assert instrumented example-subprocess reporter coverage, and write the in-process reporter and problems profile to coverage.out
 test:
-	$(GO) test -v -coverprofile=coverage.out -covermode=atomic -coverpkg=github.com/frostyard/std/reporter ./...
+	$(GO) test -v -coverprofile=coverage.out -covermode=atomic -coverpkg=github.com/frostyard/std/reporter,github.com/frostyard/std/problems ./...
 
 ## test-cover: Run tests with coverage (writes coverage.out plus an HTML report)
 test-cover:
-	$(GO) test -coverprofile=coverage.out -covermode=atomic -coverpkg=github.com/frostyard/std/reporter ./...
+	$(GO) test -coverprofile=coverage.out -covermode=atomic -coverpkg=github.com/frostyard/std/reporter,github.com/frostyard/std/problems ./...
 	$(GO) tool cover -html=coverage.out -o coverage.html
 
 ## coverage-check: Enforce the 95.0% total statement-coverage floor on coverage.out (scripts/check-coverage.sh)

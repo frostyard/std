@@ -20,6 +20,10 @@ Org-wide decisions binding this repo are listed in [org-adrs.md](org-adrs.md).
   — one canonical file per criterion behind committed relative symlinks
   (the alias registry), real trees for directory criteria, the docs-integrity
   gate, and the CI, release, and agent-governance surfaces added with it
+- [0002 — The problems package writes to the local journal only](adr/0002-problems-package-writes-to-the-journal-only.md)
+  — stdlib only, 1 datagram and drop on overflow, a rate cap, inert on a bad
+  identity, a reader that trusts only journald's fields, and the limits of
+  `RecoverPanic` and `CrashOutput`
 
 ### Design
 
@@ -34,6 +38,9 @@ Org-wide decisions binding this repo are listed in [org-adrs.md](org-adrs.md).
 - [Reporter package](specs/reporter-package.md) — the `Reporter` interface,
   `ProgressEvent` JSON Lines format, and exact per-implementation output
   formatting
+- [Problems package](specs/problems-package.md) — the `problems` API, the
+  journal fields of a record, the transport rules, the crash-file format,
+  the reader rules, and the shared test vector format
 - [PR review rubric](specs/pr-review-rubric.md) — the checklist every review
   applies, rows = the repo's verifiable gates (`docs/review-rubric.md` is its
   alias)

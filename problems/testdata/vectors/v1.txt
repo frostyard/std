@@ -1,0 +1,881 @@
+# frostyard.problem/1 shared test vectors for the std problems package (Go)
+# and the frostyard-problems crate (Rust). Format: README.md in this folder.
+# Contract: frostyard/core docs/specs/problem-report.md.
+
+# A valid Go error. MESSAGE is local only; it never reaches the payload.
+vector: go-error
+type: write
+in.app_id: org.frostyard.nsl
+in.version: 1.2.3
+in.component: cli
+in.runtime: go
+in.class: error
+in.code: config.load
+in.message: open /etc/nsl.conf: permission denied
+journal.MESSAGE_ID: 8915bdd215c84cbab0c31c05a1a33e7e
+journal.PRIORITY: 3
+journal.MESSAGE: open /etc/nsl.conf: permission denied
+journal.FROSTYARD_SCHEMA: frostyard.problem/1
+journal.FROSTYARD_APP_ID: org.frostyard.nsl
+journal.FROSTYARD_APP_VERSION: 1.2.3
+journal.FROSTYARD_RUNTIME: go
+journal.FROSTYARD_COMPONENT: cli
+journal.FROSTYARD_CLASS: error
+journal.FROSTYARD_CODE: config.load
+payload.app_id: org.frostyard.nsl
+payload.app_version: 1.2.3
+payload.runtime: go
+payload.component: cli
+payload.class: error
+payload.code: config.load
+expect: ok
+
+# An error with no error value: MESSAGE is the code.
+vector: go-error-no-message
+type: write
+in.app_id: org.frostyard.pilothouse
+in.version: 0.4.0-rc.2
+in.component: daemon
+in.runtime: go
+in.class: error
+in.code: sync.timeout
+journal.MESSAGE_ID: 8915bdd215c84cbab0c31c05a1a33e7e
+journal.PRIORITY: 3
+journal.MESSAGE: sync.timeout
+journal.FROSTYARD_SCHEMA: frostyard.problem/1
+journal.FROSTYARD_APP_ID: org.frostyard.pilothouse
+journal.FROSTYARD_APP_VERSION: 0.4.0-rc.2
+journal.FROSTYARD_RUNTIME: go
+journal.FROSTYARD_COMPONENT: daemon
+journal.FROSTYARD_CLASS: error
+journal.FROSTYARD_CODE: sync.timeout
+payload.app_id: org.frostyard.pilothouse
+payload.app_version: 0.4.0-rc.2
+payload.runtime: go
+payload.component: daemon
+payload.class: error
+payload.code: sync.timeout
+expect: ok
+
+# MESSAGE is cut to 2048 bytes on a UTF-8 boundary: the 2-byte rune at bytes 2047-2048 goes.
+vector: go-error-long-message
+type: write
+in.app_id: org.frostyard.nsl
+in.version: 1.2.3
+in.component: cli
+in.runtime: go
+in.class: error
+in.code: big
+in.message: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaé
+journal.MESSAGE_ID: 8915bdd215c84cbab0c31c05a1a33e7e
+journal.PRIORITY: 3
+journal.MESSAGE: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+journal.FROSTYARD_SCHEMA: frostyard.problem/1
+journal.FROSTYARD_APP_ID: org.frostyard.nsl
+journal.FROSTYARD_APP_VERSION: 1.2.3
+journal.FROSTYARD_RUNTIME: go
+journal.FROSTYARD_COMPONENT: cli
+journal.FROSTYARD_CLASS: error
+journal.FROSTYARD_CODE: big
+payload.app_id: org.frostyard.nsl
+payload.app_version: 1.2.3
+payload.runtime: go
+payload.component: cli
+payload.class: error
+payload.code: big
+expect: ok
+
+# A valid Go panic with frames, innermost first. A frame outside the allowed modules becomes other.
+vector: go-panic-frames
+type: write
+in.app_id: org.frostyard.nsl
+in.version: 1.2.3
+in.component: cli
+in.runtime: go
+in.class: panic
+in.message: runtime error: invalid memory address or nil pointer dereference
+in.frame: runtime.gopanic
+in.frame: github.com/frostyard/nsl/internal/store.(*DB).Open
+in.frame: github.com/spf13/cobra.(*Command).execute
+in.frame: main.main
+in.frame: runtime.main
+in.frame: runtime.goexit
+journal.MESSAGE_ID: 8915bdd215c84cbab0c31c05a1a33e7e
+journal.PRIORITY: 2
+journal.MESSAGE: runtime error: invalid memory address or nil pointer dereference
+journal.FROSTYARD_SCHEMA: frostyard.problem/1
+journal.FROSTYARD_APP_ID: org.frostyard.nsl
+journal.FROSTYARD_APP_VERSION: 1.2.3
+journal.FROSTYARD_RUNTIME: go
+journal.FROSTYARD_COMPONENT: cli
+journal.FROSTYARD_CLASS: panic
+journal.FROSTYARD_FRAMES: runtime.gopanic
+journal.FROSTYARD_FRAMES: github.com/frostyard/nsl/internal/store.(*DB).Open
+journal.FROSTYARD_FRAMES: other
+journal.FROSTYARD_FRAMES: main.main
+journal.FROSTYARD_FRAMES: runtime.main
+journal.FROSTYARD_FRAMES: runtime.goexit
+payload.app_id: org.frostyard.nsl
+payload.app_version: 1.2.3
+payload.runtime: go
+payload.component: cli
+payload.class: panic
+payload.frames: runtime.gopanic
+payload.frames: github.com/frostyard/nsl/internal/store.(*DB).Open
+payload.frames: other
+payload.frames: main.main
+payload.frames: runtime.main
+payload.frames: runtime.goexit
+expect: ok
+
+# A valid Rust panic with a location. Only the Rust writer writes it; both readers validate it.
+vector: rust-panic-location
+type: write
+in.app_id: org.frostyard.Frostmail
+in.version: 2.0.1
+in.component: gui
+in.runtime: rust
+in.class: panic
+in.message: called `Option::unwrap()` on a `None` value
+in.location: src/sync/imap.rs:214
+journal.MESSAGE_ID: 8915bdd215c84cbab0c31c05a1a33e7e
+journal.PRIORITY: 2
+journal.MESSAGE: called `Option::unwrap()` on a `None` value
+journal.FROSTYARD_SCHEMA: frostyard.problem/1
+journal.FROSTYARD_APP_ID: org.frostyard.Frostmail
+journal.FROSTYARD_APP_VERSION: 2.0.1
+journal.FROSTYARD_RUNTIME: rust
+journal.FROSTYARD_COMPONENT: gui
+journal.FROSTYARD_CLASS: panic
+journal.FROSTYARD_LOCATION: src/sync/imap.rs:214
+payload.app_id: org.frostyard.Frostmail
+payload.app_version: 2.0.1
+payload.runtime: rust
+payload.component: gui
+payload.class: panic
+payload.location: src/sync/imap.rs:214
+expect: ok
+
+# A code that fails its pattern: the writer writes nothing.
+vector: write-bad-code
+type: write
+in.app_id: org.frostyard.nsl
+in.version: 1.2.3
+in.component: cli
+in.runtime: go
+in.class: error
+in.code: Config.Load
+in.message: boom
+expect: reject
+
+# An app ID off the allowlist: the writer is inert.
+vector: write-bad-app-id
+type: write
+in.app_id: org.example.app
+in.version: 1.2.3
+in.component: cli
+in.runtime: go
+in.class: error
+in.code: x
+expect: reject
+
+# A version with a v prefix: the writer is inert.
+vector: write-bad-version
+type: write
+in.app_id: org.frostyard.nsl
+in.version: v1.2.3
+in.component: cli
+in.runtime: go
+in.class: error
+in.code: x
+expect: reject
+
+# A component outside the enum: the writer is inert.
+vector: write-bad-component
+type: write
+in.app_id: org.frostyard.nsl
+in.version: 1.2.3
+in.component: tray
+in.runtime: go
+in.class: error
+in.code: x
+expect: reject
+
+# A frostyard frame stays.
+vector: frame-frostyard
+type: frame
+in.frame: github.com/frostyard/std/problems.(*Recorder).RecoverPanic
+out.frame: github.com/frostyard/std/problems.(*Recorder).RecoverPanic
+
+# A standard library frame stays.
+vector: frame-stdlib
+type: frame
+in.frame: encoding/json.(*decodeState).object
+out.frame: encoding/json.(*decodeState).object
+
+# A frame of package main stays.
+vector: frame-main-closure
+type: frame
+in.frame: main.main.func1
+out.frame: main.main.func1
+
+# A generic frame stays.
+vector: frame-generic
+type: frame
+in.frame: github.com/frostyard/nsl/cache.Get[...]
+out.frame: github.com/frostyard/nsl/cache.Get[...]
+
+# The go-imap fork stays.
+vector: frame-go-imap
+type: frame
+in.frame: github.com/emersion/go-imap/v2/imapclient.(*Client).Wait
+out.frame: github.com/emersion/go-imap/v2/imapclient.(*Client).Wait
+
+# A module outside the allowed list becomes other.
+vector: frame-other-module
+type: frame
+in.frame: github.com/spf13/cobra.(*Command).Execute
+out.frame: other
+
+# A dotted import path becomes other.
+vector: frame-other-dotted
+type: frame
+in.frame: gopkg.in/yaml.v3.(*decoder).unmarshal
+out.frame: other
+
+# A file path becomes other.
+vector: frame-path
+type: frame
+in.frame: /home/brian/src/nsl/main.go:42
+out.frame: other
+
+# A file line with an offset becomes other.
+vector: frame-path-plus
+type: frame
+in.frame: main.main /home/brian/src/main.go:42 +0x1d
+out.frame: other
+
+# A name with arguments becomes other.
+vector: frame-args
+type: frame
+in.frame: main.run(0xc000012345, 0x2)
+out.frame: other
+
+# A name with no package becomes other.
+vector: frame-no-package
+type: frame
+in.frame: panic
+out.frame: other
+
+# An empty name becomes other.
+vector: frame-empty
+type: frame
+in.frame: 
+out.frame: other
+
+# other stays other.
+vector: frame-other
+type: frame
+in.frame: other
+out.frame: other
+
+# A frame of exactly 160 bytes stays.
+vector: frame-160
+type: frame
+in.frame: github.com/frostyard/nsl.aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+out.frame: github.com/frostyard/nsl.aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+
+# A frame of 161 bytes becomes other.
+vector: frame-161
+type: frame
+in.frame: github.com/frostyard/nsl.aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaab
+out.frame: other
+
+# A standard library path segment must be lowercase.
+vector: frame-upper-stdlib-segment
+type: frame
+in.frame: net/HTTP.Serve
+out.frame: other
+
+# After github.com/frostyard at most 6 segments follow.
+vector: frame-frostyard-too-deep
+type: frame
+in.frame: github.com/frostyard/a/b/c/d/e/f/g.F
+out.frame: other
+
+# A valid Go error.
+vector: validate-go-error
+type: validate
+journal.MESSAGE_ID: 8915bdd215c84cbab0c31c05a1a33e7e
+journal.PRIORITY: 3
+journal.MESSAGE: x
+journal.FROSTYARD_SCHEMA: frostyard.problem/1
+journal.FROSTYARD_APP_ID: org.frostyard.nsl
+journal.FROSTYARD_APP_VERSION: 1.2.3
+journal.FROSTYARD_RUNTIME: go
+journal.FROSTYARD_COMPONENT: cli
+journal.FROSTYARD_CLASS: error
+journal.FROSTYARD_CODE: a.b_c
+payload.app_id: org.frostyard.nsl
+payload.app_version: 1.2.3
+payload.runtime: go
+payload.component: cli
+payload.class: error
+payload.code: a.b_c
+expect: ok
+
+# A Go panic without frames is valid (frames are optional).
+vector: validate-go-panic-no-frames
+type: validate
+journal.MESSAGE_ID: 8915bdd215c84cbab0c31c05a1a33e7e
+journal.PRIORITY: 2
+journal.MESSAGE: x
+journal.FROSTYARD_SCHEMA: frostyard.problem/1
+journal.FROSTYARD_APP_ID: org.frostyard.nsl
+journal.FROSTYARD_APP_VERSION: 1.2.3
+journal.FROSTYARD_RUNTIME: go
+journal.FROSTYARD_COMPONENT: cli
+journal.FROSTYARD_CLASS: panic
+payload.app_id: org.frostyard.nsl
+payload.app_version: 1.2.3
+payload.runtime: go
+payload.component: cli
+payload.class: panic
+expect: ok
+
+# A Rust panic without a location is valid.
+vector: validate-rust-panic-no-location
+type: validate
+journal.MESSAGE_ID: 8915bdd215c84cbab0c31c05a1a33e7e
+journal.PRIORITY: 2
+journal.MESSAGE: x
+journal.FROSTYARD_SCHEMA: frostyard.problem/1
+journal.FROSTYARD_APP_ID: org.frostyard.nsl
+journal.FROSTYARD_APP_VERSION: 1.2.3
+journal.FROSTYARD_RUNTIME: rust
+journal.FROSTYARD_COMPONENT: cli
+journal.FROSTYARD_CLASS: panic
+payload.app_id: org.frostyard.nsl
+payload.app_version: 1.2.3
+payload.runtime: rust
+payload.component: cli
+payload.class: panic
+expect: ok
+
+# A Rust error.
+vector: validate-rust-error
+type: validate
+journal.MESSAGE_ID: 8915bdd215c84cbab0c31c05a1a33e7e
+journal.PRIORITY: 3
+journal.MESSAGE: x
+journal.FROSTYARD_SCHEMA: frostyard.problem/1
+journal.FROSTYARD_APP_ID: org.frostyard.nsl
+journal.FROSTYARD_APP_VERSION: 1.2.3
+journal.FROSTYARD_RUNTIME: rust
+journal.FROSTYARD_COMPONENT: cli
+journal.FROSTYARD_CLASS: error
+journal.FROSTYARD_CODE: io
+payload.app_id: org.frostyard.nsl
+payload.app_version: 1.2.3
+payload.runtime: rust
+payload.component: cli
+payload.class: error
+payload.code: io
+expect: ok
+
+# MESSAGE is not checked.
+vector: validate-no-message
+type: validate
+journal.MESSAGE_ID: 8915bdd215c84cbab0c31c05a1a33e7e
+journal.PRIORITY: 3
+journal.FROSTYARD_SCHEMA: frostyard.problem/1
+journal.FROSTYARD_APP_ID: org.frostyard.nsl
+journal.FROSTYARD_APP_VERSION: 1.2.3
+journal.FROSTYARD_RUNTIME: go
+journal.FROSTYARD_COMPONENT: cli
+journal.FROSTYARD_CLASS: error
+journal.FROSTYARD_CODE: io
+payload.app_id: org.frostyard.nsl
+payload.app_version: 1.2.3
+payload.runtime: go
+payload.component: cli
+payload.class: error
+payload.code: io
+expect: ok
+
+# An app ID off the allowlist.
+vector: forged-bad-app-id
+type: validate
+journal.MESSAGE_ID: 8915bdd215c84cbab0c31c05a1a33e7e
+journal.PRIORITY: 3
+journal.MESSAGE: x
+journal.FROSTYARD_SCHEMA: frostyard.problem/1
+journal.FROSTYARD_APP_ID: org.frostyard.Evil
+journal.FROSTYARD_APP_VERSION: 1.2.3
+journal.FROSTYARD_RUNTIME: go
+journal.FROSTYARD_COMPONENT: cli
+journal.FROSTYARD_CLASS: error
+journal.FROSTYARD_CODE: x
+expect: reject
+
+# Build metadata is not allowed in a version.
+vector: forged-bad-version
+type: validate
+journal.MESSAGE_ID: 8915bdd215c84cbab0c31c05a1a33e7e
+journal.PRIORITY: 3
+journal.MESSAGE: x
+journal.FROSTYARD_SCHEMA: frostyard.problem/1
+journal.FROSTYARD_APP_ID: org.frostyard.nsl
+journal.FROSTYARD_APP_VERSION: 1.2.3+build.1
+journal.FROSTYARD_RUNTIME: go
+journal.FROSTYARD_COMPONENT: cli
+journal.FROSTYARD_CLASS: error
+journal.FROSTYARD_CODE: x
+expect: reject
+
+# Only alpha, beta and rc prereleases.
+vector: forged-bad-version-prerelease
+type: validate
+journal.MESSAGE_ID: 8915bdd215c84cbab0c31c05a1a33e7e
+journal.PRIORITY: 3
+journal.MESSAGE: x
+journal.FROSTYARD_SCHEMA: frostyard.problem/1
+journal.FROSTYARD_APP_ID: org.frostyard.nsl
+journal.FROSTYARD_APP_VERSION: 1.2.3-dev.1
+journal.FROSTYARD_RUNTIME: go
+journal.FROSTYARD_COMPONENT: cli
+journal.FROSTYARD_CLASS: error
+journal.FROSTYARD_CODE: x
+expect: reject
+
+# A code that fails its pattern.
+vector: forged-bad-code
+type: validate
+journal.MESSAGE_ID: 8915bdd215c84cbab0c31c05a1a33e7e
+journal.PRIORITY: 3
+journal.MESSAGE: x
+journal.FROSTYARD_SCHEMA: frostyard.problem/1
+journal.FROSTYARD_APP_ID: org.frostyard.nsl
+journal.FROSTYARD_APP_VERSION: 1.2.3
+journal.FROSTYARD_RUNTIME: go
+journal.FROSTYARD_COMPONENT: cli
+journal.FROSTYARD_CLASS: error
+journal.FROSTYARD_CODE: /home/brian/secret
+expect: reject
+
+# A code of 65 characters.
+vector: forged-long-code
+type: validate
+journal.MESSAGE_ID: 8915bdd215c84cbab0c31c05a1a33e7e
+journal.PRIORITY: 3
+journal.MESSAGE: x
+journal.FROSTYARD_SCHEMA: frostyard.problem/1
+journal.FROSTYARD_APP_ID: org.frostyard.nsl
+journal.FROSTYARD_APP_VERSION: 1.2.3
+journal.FROSTYARD_RUNTIME: go
+journal.FROSTYARD_COMPONENT: cli
+journal.FROSTYARD_CLASS: error
+journal.FROSTYARD_CODE: abbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+expect: reject
+
+# An error without a code.
+vector: forged-error-no-code
+type: validate
+journal.MESSAGE_ID: 8915bdd215c84cbab0c31c05a1a33e7e
+journal.PRIORITY: 3
+journal.MESSAGE: x
+journal.FROSTYARD_SCHEMA: frostyard.problem/1
+journal.FROSTYARD_APP_ID: org.frostyard.nsl
+journal.FROSTYARD_APP_VERSION: 1.2.3
+journal.FROSTYARD_RUNTIME: go
+journal.FROSTYARD_COMPONENT: cli
+journal.FROSTYARD_CLASS: error
+expect: reject
+
+# A code on a panic.
+vector: forged-code-on-panic
+type: validate
+journal.MESSAGE_ID: 8915bdd215c84cbab0c31c05a1a33e7e
+journal.PRIORITY: 2
+journal.MESSAGE: x
+journal.FROSTYARD_SCHEMA: frostyard.problem/1
+journal.FROSTYARD_APP_ID: org.frostyard.nsl
+journal.FROSTYARD_APP_VERSION: 1.2.3
+journal.FROSTYARD_RUNTIME: go
+journal.FROSTYARD_COMPONENT: cli
+journal.FROSTYARD_CLASS: panic
+journal.FROSTYARD_CODE: x
+expect: reject
+
+# Frames on an error.
+vector: forged-frames-on-error
+type: validate
+journal.MESSAGE_ID: 8915bdd215c84cbab0c31c05a1a33e7e
+journal.PRIORITY: 3
+journal.MESSAGE: x
+journal.FROSTYARD_SCHEMA: frostyard.problem/1
+journal.FROSTYARD_APP_ID: org.frostyard.nsl
+journal.FROSTYARD_APP_VERSION: 1.2.3
+journal.FROSTYARD_RUNTIME: go
+journal.FROSTYARD_COMPONENT: cli
+journal.FROSTYARD_CLASS: error
+journal.FROSTYARD_CODE: x
+journal.FROSTYARD_FRAMES: main.main
+expect: reject
+
+# A location on an error.
+vector: forged-location-on-error
+type: validate
+journal.MESSAGE_ID: 8915bdd215c84cbab0c31c05a1a33e7e
+journal.PRIORITY: 3
+journal.MESSAGE: x
+journal.FROSTYARD_SCHEMA: frostyard.problem/1
+journal.FROSTYARD_APP_ID: org.frostyard.nsl
+journal.FROSTYARD_APP_VERSION: 1.2.3
+journal.FROSTYARD_RUNTIME: rust
+journal.FROSTYARD_COMPONENT: cli
+journal.FROSTYARD_CLASS: error
+journal.FROSTYARD_CODE: x
+journal.FROSTYARD_LOCATION: src/main.rs:1
+expect: reject
+
+# Frames on a Rust record.
+vector: forged-frames-on-rust
+type: validate
+journal.MESSAGE_ID: 8915bdd215c84cbab0c31c05a1a33e7e
+journal.PRIORITY: 2
+journal.MESSAGE: x
+journal.FROSTYARD_SCHEMA: frostyard.problem/1
+journal.FROSTYARD_APP_ID: org.frostyard.nsl
+journal.FROSTYARD_APP_VERSION: 1.2.3
+journal.FROSTYARD_RUNTIME: rust
+journal.FROSTYARD_COMPONENT: cli
+journal.FROSTYARD_CLASS: panic
+journal.FROSTYARD_FRAMES: main.main
+expect: reject
+
+# A location on a Go record.
+vector: forged-location-on-go
+type: validate
+journal.MESSAGE_ID: 8915bdd215c84cbab0c31c05a1a33e7e
+journal.PRIORITY: 2
+journal.MESSAGE: x
+journal.FROSTYARD_SCHEMA: frostyard.problem/1
+journal.FROSTYARD_APP_ID: org.frostyard.nsl
+journal.FROSTYARD_APP_VERSION: 1.2.3
+journal.FROSTYARD_RUNTIME: go
+journal.FROSTYARD_COMPONENT: cli
+journal.FROSTYARD_CLASS: panic
+journal.FROSTYARD_LOCATION: src/main.rs:1
+expect: reject
+
+# A location with an absolute path.
+vector: forged-bad-location
+type: validate
+journal.MESSAGE_ID: 8915bdd215c84cbab0c31c05a1a33e7e
+journal.PRIORITY: 2
+journal.MESSAGE: x
+journal.FROSTYARD_SCHEMA: frostyard.problem/1
+journal.FROSTYARD_APP_ID: org.frostyard.nsl
+journal.FROSTYARD_APP_VERSION: 1.2.3
+journal.FROSTYARD_RUNTIME: rust
+journal.FROSTYARD_COMPONENT: cli
+journal.FROSTYARD_CLASS: panic
+journal.FROSTYARD_LOCATION: /home/brian/src/main.rs:1
+expect: reject
+
+# A location with line 0.
+vector: forged-location-line-zero
+type: validate
+journal.MESSAGE_ID: 8915bdd215c84cbab0c31c05a1a33e7e
+journal.PRIORITY: 2
+journal.MESSAGE: x
+journal.FROSTYARD_SCHEMA: frostyard.problem/1
+journal.FROSTYARD_APP_ID: org.frostyard.nsl
+journal.FROSTYARD_APP_VERSION: 1.2.3
+journal.FROSTYARD_RUNTIME: rust
+journal.FROSTYARD_COMPONENT: cli
+journal.FROSTYARD_CLASS: panic
+journal.FROSTYARD_LOCATION: src/main.rs:0
+expect: reject
+
+# A component outside the enum is invalid in a journal record (no mapping to other).
+vector: forged-unknown-component
+type: validate
+journal.MESSAGE_ID: 8915bdd215c84cbab0c31c05a1a33e7e
+journal.PRIORITY: 3
+journal.MESSAGE: x
+journal.FROSTYARD_SCHEMA: frostyard.problem/1
+journal.FROSTYARD_APP_ID: org.frostyard.nsl
+journal.FROSTYARD_APP_VERSION: 1.2.3
+journal.FROSTYARD_RUNTIME: go
+journal.FROSTYARD_COMPONENT: tray
+journal.FROSTYARD_CLASS: error
+journal.FROSTYARD_CODE: x
+expect: reject
+
+# A runtime outside the enum.
+vector: forged-unknown-runtime
+type: validate
+journal.MESSAGE_ID: 8915bdd215c84cbab0c31c05a1a33e7e
+journal.PRIORITY: 3
+journal.MESSAGE: x
+journal.FROSTYARD_SCHEMA: frostyard.problem/1
+journal.FROSTYARD_APP_ID: org.frostyard.nsl
+journal.FROSTYARD_APP_VERSION: 1.2.3
+journal.FROSTYARD_RUNTIME: python
+journal.FROSTYARD_COMPONENT: cli
+journal.FROSTYARD_CLASS: error
+journal.FROSTYARD_CODE: x
+expect: reject
+
+# A class outside the enum.
+vector: forged-unknown-class
+type: validate
+journal.MESSAGE_ID: 8915bdd215c84cbab0c31c05a1a33e7e
+journal.PRIORITY: 3
+journal.MESSAGE: x
+journal.FROSTYARD_SCHEMA: frostyard.problem/1
+journal.FROSTYARD_APP_ID: org.frostyard.nsl
+journal.FROSTYARD_APP_VERSION: 1.2.3
+journal.FROSTYARD_RUNTIME: go
+journal.FROSTYARD_COMPONENT: cli
+journal.FROSTYARD_CLASS: warning
+journal.FROSTYARD_CODE: x
+expect: reject
+
+# A FROSTYARD field that the registry does not name.
+vector: forged-unknown-field
+type: validate
+journal.MESSAGE_ID: 8915bdd215c84cbab0c31c05a1a33e7e
+journal.PRIORITY: 3
+journal.MESSAGE: x
+journal.FROSTYARD_SCHEMA: frostyard.problem/1
+journal.FROSTYARD_APP_ID: org.frostyard.nsl
+journal.FROSTYARD_APP_VERSION: 1.2.3
+journal.FROSTYARD_RUNTIME: go
+journal.FROSTYARD_COMPONENT: cli
+journal.FROSTYARD_CLASS: error
+journal.FROSTYARD_CODE: x
+journal.FROSTYARD_USER: brian
+expect: reject
+
+# A schema that the reader does not know.
+vector: forged-wrong-schema
+type: validate
+journal.MESSAGE_ID: 8915bdd215c84cbab0c31c05a1a33e7e
+journal.PRIORITY: 3
+journal.MESSAGE: x
+journal.FROSTYARD_SCHEMA: frostyard.problem/2
+journal.FROSTYARD_APP_ID: org.frostyard.nsl
+journal.FROSTYARD_APP_VERSION: 1.2.3
+journal.FROSTYARD_RUNTIME: go
+journal.FROSTYARD_COMPONENT: cli
+journal.FROSTYARD_CLASS: error
+journal.FROSTYARD_CODE: x
+expect: reject
+
+# No FROSTYARD_SCHEMA.
+vector: forged-no-schema
+type: validate
+journal.MESSAGE_ID: 8915bdd215c84cbab0c31c05a1a33e7e
+journal.PRIORITY: 3
+journal.MESSAGE: x
+journal.FROSTYARD_APP_ID: org.frostyard.nsl
+journal.FROSTYARD_APP_VERSION: 1.2.3
+journal.FROSTYARD_RUNTIME: go
+journal.FROSTYARD_COMPONENT: cli
+journal.FROSTYARD_CLASS: error
+journal.FROSTYARD_CODE: x
+expect: reject
+
+# A wrong MESSAGE_ID.
+vector: forged-wrong-message-id
+type: validate
+journal.MESSAGE_ID: 0123456789abcdef0123456789abcdef
+journal.PRIORITY: 3
+journal.MESSAGE: x
+journal.FROSTYARD_SCHEMA: frostyard.problem/1
+journal.FROSTYARD_APP_ID: org.frostyard.nsl
+journal.FROSTYARD_APP_VERSION: 1.2.3
+journal.FROSTYARD_RUNTIME: go
+journal.FROSTYARD_COMPONENT: cli
+journal.FROSTYARD_CLASS: error
+journal.FROSTYARD_CODE: x
+expect: reject
+
+# 33 frames.
+vector: forged-33-frames
+type: validate
+journal.MESSAGE_ID: 8915bdd215c84cbab0c31c05a1a33e7e
+journal.PRIORITY: 2
+journal.MESSAGE: x
+journal.FROSTYARD_SCHEMA: frostyard.problem/1
+journal.FROSTYARD_APP_ID: org.frostyard.nsl
+journal.FROSTYARD_APP_VERSION: 1.2.3
+journal.FROSTYARD_RUNTIME: go
+journal.FROSTYARD_COMPONENT: cli
+journal.FROSTYARD_CLASS: panic
+journal.FROSTYARD_FRAMES: main.main
+journal.FROSTYARD_FRAMES: main.main
+journal.FROSTYARD_FRAMES: main.main
+journal.FROSTYARD_FRAMES: main.main
+journal.FROSTYARD_FRAMES: main.main
+journal.FROSTYARD_FRAMES: main.main
+journal.FROSTYARD_FRAMES: main.main
+journal.FROSTYARD_FRAMES: main.main
+journal.FROSTYARD_FRAMES: main.main
+journal.FROSTYARD_FRAMES: main.main
+journal.FROSTYARD_FRAMES: main.main
+journal.FROSTYARD_FRAMES: main.main
+journal.FROSTYARD_FRAMES: main.main
+journal.FROSTYARD_FRAMES: main.main
+journal.FROSTYARD_FRAMES: main.main
+journal.FROSTYARD_FRAMES: main.main
+journal.FROSTYARD_FRAMES: main.main
+journal.FROSTYARD_FRAMES: main.main
+journal.FROSTYARD_FRAMES: main.main
+journal.FROSTYARD_FRAMES: main.main
+journal.FROSTYARD_FRAMES: main.main
+journal.FROSTYARD_FRAMES: main.main
+journal.FROSTYARD_FRAMES: main.main
+journal.FROSTYARD_FRAMES: main.main
+journal.FROSTYARD_FRAMES: main.main
+journal.FROSTYARD_FRAMES: main.main
+journal.FROSTYARD_FRAMES: main.main
+journal.FROSTYARD_FRAMES: main.main
+journal.FROSTYARD_FRAMES: main.main
+journal.FROSTYARD_FRAMES: main.main
+journal.FROSTYARD_FRAMES: main.main
+journal.FROSTYARD_FRAMES: main.main
+journal.FROSTYARD_FRAMES: main.main
+expect: reject
+
+# 32 frames are valid.
+vector: validate-32-frames
+type: validate
+journal.MESSAGE_ID: 8915bdd215c84cbab0c31c05a1a33e7e
+journal.PRIORITY: 2
+journal.MESSAGE: x
+journal.FROSTYARD_SCHEMA: frostyard.problem/1
+journal.FROSTYARD_APP_ID: org.frostyard.nsl
+journal.FROSTYARD_APP_VERSION: 1.2.3
+journal.FROSTYARD_RUNTIME: go
+journal.FROSTYARD_COMPONENT: cli
+journal.FROSTYARD_CLASS: panic
+journal.FROSTYARD_FRAMES: main.main
+journal.FROSTYARD_FRAMES: main.main
+journal.FROSTYARD_FRAMES: main.main
+journal.FROSTYARD_FRAMES: main.main
+journal.FROSTYARD_FRAMES: main.main
+journal.FROSTYARD_FRAMES: main.main
+journal.FROSTYARD_FRAMES: main.main
+journal.FROSTYARD_FRAMES: main.main
+journal.FROSTYARD_FRAMES: main.main
+journal.FROSTYARD_FRAMES: main.main
+journal.FROSTYARD_FRAMES: main.main
+journal.FROSTYARD_FRAMES: main.main
+journal.FROSTYARD_FRAMES: main.main
+journal.FROSTYARD_FRAMES: main.main
+journal.FROSTYARD_FRAMES: main.main
+journal.FROSTYARD_FRAMES: main.main
+journal.FROSTYARD_FRAMES: main.main
+journal.FROSTYARD_FRAMES: main.main
+journal.FROSTYARD_FRAMES: main.main
+journal.FROSTYARD_FRAMES: main.main
+journal.FROSTYARD_FRAMES: main.main
+journal.FROSTYARD_FRAMES: main.main
+journal.FROSTYARD_FRAMES: main.main
+journal.FROSTYARD_FRAMES: main.main
+journal.FROSTYARD_FRAMES: main.main
+journal.FROSTYARD_FRAMES: main.main
+journal.FROSTYARD_FRAMES: main.main
+journal.FROSTYARD_FRAMES: main.main
+journal.FROSTYARD_FRAMES: main.main
+journal.FROSTYARD_FRAMES: main.main
+journal.FROSTYARD_FRAMES: main.main
+journal.FROSTYARD_FRAMES: main.main
+payload.app_id: org.frostyard.nsl
+payload.app_version: 1.2.3
+payload.runtime: go
+payload.component: cli
+payload.class: panic
+payload.frames: main.main
+payload.frames: main.main
+payload.frames: main.main
+payload.frames: main.main
+payload.frames: main.main
+payload.frames: main.main
+payload.frames: main.main
+payload.frames: main.main
+payload.frames: main.main
+payload.frames: main.main
+payload.frames: main.main
+payload.frames: main.main
+payload.frames: main.main
+payload.frames: main.main
+payload.frames: main.main
+payload.frames: main.main
+payload.frames: main.main
+payload.frames: main.main
+payload.frames: main.main
+payload.frames: main.main
+payload.frames: main.main
+payload.frames: main.main
+payload.frames: main.main
+payload.frames: main.main
+payload.frames: main.main
+payload.frames: main.main
+payload.frames: main.main
+payload.frames: main.main
+payload.frames: main.main
+payload.frames: main.main
+payload.frames: main.main
+payload.frames: main.main
+expect: ok
+
+# An empty FROSTYARD_FRAMES.
+vector: forged-empty-frames
+type: validate
+journal.MESSAGE_ID: 8915bdd215c84cbab0c31c05a1a33e7e
+journal.PRIORITY: 2
+journal.MESSAGE: x
+journal.FROSTYARD_SCHEMA: frostyard.problem/1
+journal.FROSTYARD_APP_ID: org.frostyard.nsl
+journal.FROSTYARD_APP_VERSION: 1.2.3
+journal.FROSTYARD_RUNTIME: go
+journal.FROSTYARD_COMPONENT: cli
+journal.FROSTYARD_CLASS: panic
+journal.FROSTYARD_FRAMES:
+expect: reject
+
+# A frame that fails its pattern: a reader rejects it; only a writer maps to other.
+vector: forged-bad-frame
+type: validate
+journal.MESSAGE_ID: 8915bdd215c84cbab0c31c05a1a33e7e
+journal.PRIORITY: 2
+journal.MESSAGE: x
+journal.FROSTYARD_SCHEMA: frostyard.problem/1
+journal.FROSTYARD_APP_ID: org.frostyard.nsl
+journal.FROSTYARD_APP_VERSION: 1.2.3
+journal.FROSTYARD_RUNTIME: go
+journal.FROSTYARD_COMPONENT: cli
+journal.FROSTYARD_CLASS: panic
+journal.FROSTYARD_FRAMES: main.main
+journal.FROSTYARD_FRAMES: /home/brian/main.go:3
+expect: reject
+
+# A frame of 161 bytes.
+vector: forged-long-frame
+type: validate
+journal.MESSAGE_ID: 8915bdd215c84cbab0c31c05a1a33e7e
+journal.PRIORITY: 2
+journal.MESSAGE: x
+journal.FROSTYARD_SCHEMA: frostyard.problem/1
+journal.FROSTYARD_APP_ID: org.frostyard.nsl
+journal.FROSTYARD_APP_VERSION: 1.2.3
+journal.FROSTYARD_RUNTIME: go
+journal.FROSTYARD_COMPONENT: cli
+journal.FROSTYARD_CLASS: panic
+journal.FROSTYARD_FRAMES: github.com/frostyard/nsl.aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaab
+expect: reject

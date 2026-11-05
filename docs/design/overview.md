@@ -2,7 +2,10 @@
 
 ## Purpose
 
-`github.com/frostyard/std` is a Go standard library module for the Frostyard project. It provides shared, reusable packages with **zero external dependencies** (stdlib only). Currently the module contains a single package — `reporter` — which defines a progress-reporting interface and three implementations for human-readable, machine-readable, and silent output.
+`github.com/frostyard/std` is a Go standard library module for the Frostyard project. It provides shared, reusable packages with **zero external dependencies** (stdlib only). The module contains two packages:
+
+- `reporter` — a progress-reporting interface and three implementations for human-readable, machine-readable, and silent output.
+- `problems` — writes problem records (panics and coded errors) of a frostyard app to the local systemd journal, and reads them back for chairlift. It never sends anything over a network ([ADR-0002](../adr/0002-problems-package-writes-to-the-journal-only.md), [specs/problems-package.md](../specs/problems-package.md)).
 
 ## Architecture
 
@@ -14,6 +17,18 @@
 │   ├── json.go            # JSONReporter — JSON Lines output (thread-safe)
 │   ├── noop.go            # NoopReporter — silent discard (zero-value)
 │   ├── *_test.go          # One test file per implementation
+├── problems/              # Problem records in the local journal (core spec problem-report.md, S8)
+│   ├── problems.go        # Constants, Component, v1 patterns/allowlist/enums, MapFrame, Detail, Validate
+│   ├── journal.go         # Native-protocol encoding, DecodeEntry
+│   ├── recorder.go        # Recorder, New, Error, RecoverPanic, rate cap
+│   ├── transport_linux.go # 1 non-blocking AF_UNIX datagram for each record (syscall)
+│   ├── crash_linux.go     # CrashOutput: locked crash files, leftovers at the next start
+│   ├── crashparse.go      # Crash file header and traceback parsing
+│   ├── reader.go          # ParseJSON, Record, Trusted, Result
+│   ├── read_linux.go      # Read: runs journalctl
+│   ├── other.go           # Non-Linux stubs (no journal)
+│   ├── *_test.go          # Unit and subprocess tests
+│   └── testdata/vectors/  # Shared Go/Rust test vectors (plain line format, README.md)
 ├── _examples/             # Runnable example programs
 │   ├── deploy/            # Multi-step deployment pipeline
 │   ├── fileprocess/       # Batch file processing with progress
@@ -23,9 +38,9 @@
 ├── docs/                  # All docs, core's four-category shape (formerly yeti/)
 │   ├── README.md          # Category table + index of every doc
 │   ├── org-adrs.md        # Core ADRs binding this repo
-│   ├── adr/               # Repo-local decisions — 0001 (conformance aliases)
+│   ├── adr/               # Repo-local decisions — 0001 (conformance aliases), 0002 (problems: journal only)
 │   ├── design/            # Living architecture docs — this file, quality-loop.md
-│   ├── specs/             # Exact contracts — reporter-package.md, PR rubric, PR metric
+│   ├── specs/             # Exact contracts — reporter-package.md, problems-package.md, PR rubric, PR metric
 │   ├── plans/             # Design documents and implementation plans
 │   └── metrics.md, review-rubric.md, quality.md   # conformance aliases (ADR-0001)
 ├── .github/
@@ -51,7 +66,9 @@
 ```
 
 For the reporter package's exact interface and output contract, see
-[../specs/reporter-package.md](../specs/reporter-package.md).
+[../specs/reporter-package.md](../specs/reporter-package.md). For the
+problems package's API, journal fields, transport, crash files, reader rules
+and test vectors, see [../specs/problems-package.md](../specs/problems-package.md).
 
 ## Key Patterns
 
@@ -98,6 +115,40 @@ Three important design decisions for correct JSON serialization:
 - `JSONReporter` never drops an event because its `Details` cannot be encoded: when `Complete` (the only method that forwards arbitrary caller data) receives a value `encoding/json` rejects (func, channel, NaN/Inf, failing `Marshaler`), the event is re-emitted with `Details` set to `{"encoding_error": "<reason>"}` so consumers still see the terminal `complete` line. Writer (I/O) errors stay silent to callers but make that reporter fail-stop: every later event is dropped so no valid-looking record can follow a partial JSON fragment — see [reporter-package.md](../specs/reporter-package.md#jsonreporter-reporterjsongo)
 - `TextReporter` is fail-stop the same way: a writer (I/O) error, including a short write, stays silent to callers but latches so every later reporting call is a no-op — no output can follow a partial or failed stream — see [reporter-package.md](../specs/reporter-package.md#textreporter-reportertextgo)
 
+### Problem records: local journal only
+
+The `problems` package implements the writer and reader side of
+[core `docs/specs/problem-report.md`](https://github.com/frostyard/core/blob/main/docs/specs/problem-report.md)
+(decision: [ADR-0002](../adr/0002-problems-package-writes-to-the-journal-only.md)).
+An app makes 1 `Recorder` with `problems.New(appID, version, component)`,
+defers `r.RecoverPanic()` at the top of `main` and of each goroutine, calls
+`r.CrashOutput()` early in `main`, and calls `r.Error(code, err)` for coded
+errors.
+
+- **Writer.** A record is 1 datagram in the journal native protocol (binary
+  form) to `/run/systemd/journal/socket`, sent on a new non-blocking socket
+  made with package `syscall`. Every send failure drops the record silently;
+  at most 10 records for each process in any 60 seconds. A bad identity makes
+  the recorder inert instead of failing.
+- **Two crash paths.** `RecoverPanic` records a panic of its own goroutine
+  at once and panics again. `CrashOutput` (`runtime/debug.SetCrashOutput`)
+  catches everything else — panics of other goroutines and fatal errors —
+  in a locked `*.crash` file that the next start turns into 1 record. A
+  marker line keeps the 2 paths from recording 1 panic twice: a leftover is
+  skipped only when it holds the marker and its first `panic: ` line ends
+  with ` [recovered, repanicked]`, so a later fatal error or plain panic
+  still gives a record.
+- **Reader.** `Read` runs `journalctl -o json --all` and `ParseJSON`
+  validates each entry with `Validate`, the one validation path: journal
+  records are untrusted, so a record that fails is dropped and counted, and
+  only journald's own `_` fields are trusted.
+- **Shared vectors.** `problems/testdata/vectors/v1.txt` is a plain line
+  format so that the later Rust crate (`rust/`) runs the same cases without
+  serde.
+- **Platforms.** The transport, `CrashOutput` and `Read` are Linux only
+  (`_linux.go` files); other OSes get stubs that compile and do nothing, and
+  `Read` wraps `errors.ErrUnsupported`.
+
 ### Modern Go (1.26)
 
 The codebase uses modern Go features:
@@ -107,16 +158,19 @@ The codebase uses modern Go features:
 
 ### Testing patterns
 
-- One test file per implementation (`text_test.go`, `json_test.go`, `noop_test.go`)
+- One test file per implementation (`text_test.go`, `json_test.go`, `noop_test.go`); `problems/` has one test file per source file
+- `problems` tests bind a `unixgram` socket in `t.TempDir()` and pass it with `WithSocket`; they replace the rate-cap clock instead of sleeping, and re-run the test binary (a `TestMain` switch on `PROBLEMS_TEST_HELPER`) for real panics and crashes
 - Standard `testing` package only — no test frameworks
 - Output captured via `bytes.Buffer`
 - JSON tests unmarshal and validate individual fields (type, message, timestamp presence)
 - Tests verify exact output formatting for text reporter
-- End-to-end: `tests/e2e/examples_test.go` builds each `_examples/*` program with Go coverage instrumentation and runs it as a subprocess in `json`, `text`, `noop`, and an invalid format under a project-local `GOCOVERDIR`, decoding the JSON Lines stream with `reporter.ProgressEvent` (unknown fields rejected; last event `complete`). A final `go tool covdata percent` assertion fails unless the subprocesses covered reporter statements; an empty-directory regression test pins that failure path. This subprocess signal is separate from the in-process `coverage.out` profile and its 95% floor. `go test ./...` skips underscore directories, so this is the only thing that compiles the examples ([tests/e2e/README.md](../../tests/e2e/README.md)).
+- End-to-end: `tests/e2e/examples_test.go` builds each `_examples/*` program with Go coverage instrumentation and runs it as a subprocess in `json`, `text`, `noop`, and an invalid format under a project-local `GOCOVERDIR`, decoding the JSON Lines stream with `reporter.ProgressEvent` (unknown fields rejected; last event `complete`). A final `go tool covdata percent` assertion fails unless the subprocesses covered reporter statements; an empty-directory regression test pins that failure path. This subprocess signal is separate from the in-process `coverage.out` profile and its 95% floor, which covers the `reporter` and `problems` packages together (`-coverpkg`). `go test ./...` skips underscore directories, so this is the only thing that compiles the examples ([tests/e2e/README.md](../../tests/e2e/README.md)).
 
 ## Configuration
 
-This module has no configuration files, environment variables, or runtime configuration. Behavior is determined entirely by which `Reporter` implementation is instantiated and what `io.Writer` is passed to its constructor.
+The `reporter` package has no configuration files, environment variables, or runtime configuration. Behavior is determined entirely by which `Reporter` implementation is instantiated and what `io.Writer` is passed to its constructor.
+
+The `problems` package reads `STATE_DIRECTORY`, `XDG_STATE_HOME` and `HOME` only to find its crash folder (`CrashOutput`), and runs `journalctl` from `PATH` unless `ReadOptions.Journalctl` names it.
 
 Examples use a `-format` command-line flag to select between `text`, `json`, and `noop` output modes.
 
@@ -168,5 +222,7 @@ Documents in [../plans/](../plans/) provide context for planned and past work:
 - **reporter examples** ([2026-03-04-reporter-examples-design.md](../plans/2026-03-04-reporter-examples-design.md), [2026-03-04-reporter-examples.md](../plans/2026-03-04-reporter-examples.md)) — Design for the `_examples/` directory demonstrating reporter usage patterns.
 
 ## Downstream Consumers
+
+The `problems` package is written for frostyard apps (the S8 app ID allowlist: chairlift, nsl, intuneme, pilothouse, frostmail, frostnotes, frostread); chairlift uses its reader.
 
 The `reporter` package is used by Frostyard CLI tools including `nbc`, `updex`, and `intuneme`. These tools use the `Reporter` interface for progress output during operations like disk management, package updates, and Intune management. The [clix](https://github.com/frostyard/clix) module provides a `NewReporter()` factory that selects the implementation based on `--json`/`--silent` flags.
