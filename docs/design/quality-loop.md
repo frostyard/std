@@ -102,6 +102,13 @@ PR template ──► review rubric ──► CI gates ──► corrections ─
     sets `pro: true` and OSS GoReleaser refuses to validate Pro fields. Without
     the key, the complementary guard emits `GORELEASER_KEY unavailable for this
     run; skipping goreleaser check.` and the job succeeds without validation.
+  - *Rust crate* (`rust`): `make rust-check` on the Rust toolchain that
+    [`mise.toml`](../../mise.toml) pins (installed by `jdx/mise-action`):
+    `cargo fmt --check`, `cargo clippy -D warnings`, `cargo test` (with the
+    shared vectors), check builds for `x86_64-pc-windows-gnu` and
+    `x86_64-apple-darwin`, and a `cargo tree` that holds only the crate
+    ([ADR-0003](../adr/0003-rust-crate-frostyard-problems-in-rust-folder.md)).
+    `make ci` runs the same target as its last step.
   - `make check` (fmt → lint → vet → test) reproduces the Go half locally,
     including both passes over the example programs.
 

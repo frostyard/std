@@ -7,6 +7,8 @@
 - `reporter` — a progress-reporting interface and three implementations for human-readable, machine-readable, and silent output.
 - `problems` — writes problem records (panics and coded errors) of a frostyard app to the local systemd journal, and reads them back for chairlift. It never sends anything over a network ([ADR-0002](../adr/0002-problems-package-writes-to-the-journal-only.md), [specs/problems-package.md](../specs/problems-package.md)).
 
+Beside the Go module, the folder `rust/` holds the Rust crate `frostyard-problems`: the same problem-record writer and `validate` for frostyard Rust apps, stdlib only, run against the same shared vectors ([ADR-0003](../adr/0003-rust-crate-frostyard-problems-in-rust-folder.md), [specs/problems-package.md § Rust crate](../specs/problems-package.md#rust-crate)).
+
 ## Architecture
 
 ```
@@ -29,6 +31,19 @@
 │   ├── other.go           # Non-Linux stubs (no journal)
 │   ├── *_test.go          # Unit and subprocess tests
 │   └── testdata/vectors/  # Shared Go/Rust test vectors (plain line format, README.md)
+├── rust/                  # Rust crate frostyard-problems (ADR-0003); its own cargo workspace root
+│   ├── Cargo.toml, Cargo.lock  # no dependency of any kind; publish = false
+│   ├── README.md          # Usage: cargo git dependency on a std tag
+│   └── src/
+│       ├── lib.rs         # Constants, Component, re-exports
+│       ├── patterns.rs    # Hand-written v1 matchers (semver, code, frame, location), allowlist, enums
+│       ├── validate.rs    # Detail, Invalid, validate (the rules of Go Validate)
+│       ├── journal.rs     # Native-protocol encoding, decode_entry, the MESSAGE cut
+│       ├── location.rs    # crate root and map_location: the "crate that installs the hook" rule
+│       ├── recorder.rs    # Recorder, error, install_panic_hook (record, then the previous hook)
+│       ├── rate.rs        # The process-wide rate cap (10 in any 60 s)
+│       ├── transport.rs   # 1 non-blocking UnixDatagram send (Linux); no-op elsewhere
+│       └── tests/         # Unit tests, the vector runner, the subprocess panic-hook test
 ├── _examples/             # Runnable example programs
 │   ├── deploy/            # Multi-step deployment pipeline
 │   ├── fileprocess/       # Batch file processing with progress
@@ -38,13 +53,13 @@
 ├── docs/                  # All docs, core's four-category shape (formerly yeti/)
 │   ├── README.md          # Category table + index of every doc
 │   ├── org-adrs.md        # Core ADRs binding this repo
-│   ├── adr/               # Repo-local decisions — 0001 (conformance aliases), 0002 (problems: journal only)
+│   ├── adr/               # Repo-local decisions — 0001 (conformance aliases), 0002 (problems: journal only), 0003 (Rust crate in rust/)
 │   ├── design/            # Living architecture docs — this file, quality-loop.md
 │   ├── specs/             # Exact contracts — reporter-package.md, problems-package.md, PR rubric, PR metric
 │   ├── plans/             # Design documents and implementation plans
 │   └── metrics.md, review-rubric.md, quality.md   # conformance aliases (ADR-0001)
 ├── .github/
-│   ├── workflows/ci.yml   # Lint, Security Scan, Unit Tests, Race Detection, Examples Cross-Arch Build, Verify, Docs integrity, Release config
+│   ├── workflows/ci.yml   # Lint, Security Scan, Unit Tests, Race Detection, Examples Cross-Arch Build, Verify, Rust crate, Docs integrity, Release config
 │   ├── workflows/release.yml  # On tag push: changelog-only GoReleaser release
 │   ├── pull_request_template.md, ISSUE_TEMPLATE/, prompts/
 │   ├── copilot-instructions.md -> ../AGENTS.md
@@ -145,8 +160,22 @@ errors.
   records are untrusted, so a record that fails is dropped and counted, and
   only journald's own `_` fields are trusted.
 - **Shared vectors.** `problems/testdata/vectors/v1.txt` is a plain line
-  format so that the later Rust crate (`rust/`) runs the same cases without
+  format so that the Rust crate (`rust/`) runs the same cases without
   serde.
+- **Rust crate.** `frostyard-problems` in `rust/` writes the same records
+  with `FROSTYARD_RUNTIME=rust` and a `FROSTYARD_LOCATION` instead of
+  frames. `Recorder::install_panic_hook` records each panic first and then
+  calls the previous hook. It is `#[track_caller]` and takes the app's
+  `env!("CARGO_MANIFEST_DIR")`: the caller file and that folder give the
+  crate root (`""`, `src-tauri/`, or `src/apps/mail/` for a nested member),
+  and `map_location` keeps a location only for a relative file under
+  `<crate_root>src/`, so other crates, dependencies and the standard
+  library never get one; an unknown or ambiguous root gives no location.
+  `error` formats its error inside `catch_unwind`, only when it can write,
+  and leaks the payload of a caught panic. Its matchers are hand-written ports of the Go regular
+  expressions, and it validates Go records too (frames included), so both
+  validators accept and reject the same vectors
+  ([ADR-0003](../adr/0003-rust-crate-frostyard-problems-in-rust-folder.md)).
 - **Platforms.** The transport, `CrashOutput` and `Read` are Linux only
   (`_linux.go` files); other OSes get stubs that compile and do nothing, and
   `Read` wraps `errors.ErrUnsupported`.
@@ -161,6 +190,7 @@ The codebase uses modern Go features:
 ### Testing patterns
 
 - One test file per implementation (`text_test.go`, `json_test.go`, `noop_test.go`); `problems/` has one test file per source file
+- The Rust crate's tests (`rust/src/tests/`) bind a `UnixDatagram` in a new folder under the temporary folder, serialize the tests that send records with a static lock and reset the shared rate cap, run every shared vector, and re-run the test binary (`--exact`, an environment switch) to test the panic hook in a real panic
 - `problems` tests bind a `unixgram` socket in `t.TempDir()` and pass it with `WithSocket`; they replace the rate-cap clock instead of sleeping, and re-run the test binary (a `TestMain` switch on `PROBLEMS_TEST_HELPER`) for real panics and crashes
 - Standard `testing` package only — no test frameworks
 - Output captured via `bytes.Buffer`
@@ -184,12 +214,14 @@ make test            # Run all tests (unit + tests/e2e)
 make lint            # Run golangci-lint (.golangci.yml)
 make test-cover      # Tests with coverage + HTML report
 make bump            # Tag next semver with svu and push (triggers release.yml)
+make rust-check      # Rust crate: fmt, clippy, tests, Windows/macOS check builds, no dependency
 node scripts/check-docs.mjs   # Docs-integrity gate
 ```
 
 CI (`.github/workflows/ci.yml`) runs Lint, Security Scan, Unit Tests, Race
 Detection, Examples Cross-Arch Build (the same cross-compilation `make ci` runs
-locally), Verify (tidy/vet/gofmt), Docs integrity, and Release config on every
+locally), Verify (tidy/vet/gofmt), Rust crate (`make rust-check`, also the last
+step of `make ci`), Docs integrity, and Release config on every
 PR, every push to `main`, and every merge-queue branch (`merge_group`);
 the loop around it — template, rubric, gates, corrections, metric, release
 path — is described in [quality-loop.md](quality-loop.md).
@@ -225,6 +257,6 @@ Documents in [../plans/](../plans/) provide context for planned and past work:
 
 ## Downstream Consumers
 
-The `problems` package is written for frostyard apps (the S8 app ID allowlist: chairlift, nsl, intuneme, pilothouse, frostmail, frostnotes, frostread); chairlift uses its reader.
+The `problems` package is written for frostyard apps (the S8 app ID allowlist: chairlift, nsl, intuneme, pilothouse, frostmail, frostnotes, frostread); chairlift uses its reader. Frostyard apps written in Rust use the crate `frostyard-problems` through a cargo git dependency on a std tag.
 
 The `reporter` package is used by Frostyard CLI tools including `nbc`, `updex`, and `intuneme`. These tools use the `Reporter` interface for progress output during operations like disk management, package updates, and Intune management. The [clix](https://github.com/frostyard/clix) module provides a `NewReporter()` factory that selects the implementation based on `--json`/`--silent` flags.

@@ -3,7 +3,11 @@
 `github.com/frostyard/std` is a Go standard library module for the Frostyard
 project. It provides shared packages with **zero external dependencies**
 (stdlib only). It contains 2 packages: `reporter` (progress reporting) and
-`problems` (problem records in the local systemd journal). Start at
+`problems` (problem records in the local systemd journal). The folder
+[`rust/`](rust/README.md) holds the Rust crate `frostyard-problems`, the
+same problem-record writer for Rust apps (Rust standard library only;
+[ADR-0003](docs/adr/0003-rust-crate-frostyard-problems-in-rust-folder.md)).
+Start at
 [docs/README.md](docs/README.md); read
 [docs/design/overview.md](docs/design/overview.md),
 [docs/specs/reporter-package.md](docs/specs/reporter-package.md) and
@@ -60,6 +64,11 @@ whichever agent you are:
   `mise.toml` (3.4.1; `mise install` provides it). svu reads `.svu.yml` only
   from v3 on, so `make bump` runs `make svu-version-check` first and refuses
   any other release on `PATH` (an older `go install`ed svu ignores the config)
+- **Rust 1.99.1** only for `make rust-check` (the crate in `rust/`), pinned
+  in `mise.toml` with clippy, rustfmt and the `x86_64-pc-windows-gnu` and
+  `x86_64-apple-darwin` targets; `mise install` provides it. `make
+  rust-check` (and so `make ci`) fails with `mise install` when `cargo` is
+  absent
 - Node 24+ only for `node scripts/check-docs.mjs` (zero dependencies);
   the 20.x line reached end-of-life on 2026-04-30, and 24 is the Active LTS
 
@@ -67,7 +76,7 @@ whichever agent you are:
 
 ```bash
 make check           # fmt + lint + vet + test + coverage floor — the local gate; run before every PR
-make ci              # canonical local gate, sequential and fail-fast: tidy diff, vet, gofmt, lint at the pin, unit+e2e tests, race, cross-arch build of _examples/ — not a mirror of the GitHub workflow (core ADR-0038)
+make ci              # canonical local gate, sequential and fail-fast: tidy diff, vet, gofmt, lint at the pin, unit+e2e tests, race, cross-arch build of _examples/, the Rust crate (make rust-check) — not a mirror of the GitHub workflow (core ADR-0038)
 make verify          # credential-free, non-mutating gate (what a read-only reviewer runs): tidy diff, gofmt -l, lint at the exact pin, vet, tests
 make test            # unit + e2e; asserts subprocess coverage and writes the in-process coverage profile
 make lint            # golangci-lint run (.golangci.yml), module + _examples/
@@ -77,6 +86,7 @@ make coverage-check  # enforce the 95.0% total statement-coverage floor on cover
 make test-coverage-check  # self-test scripts/check-coverage.sh with fixture profiles
 make svu-version-check  # fail unless the svu on PATH is the mise.toml pin (make bump runs it first)
 make bump            # tag next semver with svu and push the tag (see Releases)
+make rust-check      # Rust crate in rust/: cargo fmt --check, clippy -D warnings, cargo test, check builds for Windows and macOS, no dependency in cargo tree
 go test -v -run TestName ./reporter/   # run a single unit test
 go test -v ./tests/e2e/...             # the example-program e2e suite alone
 node scripts/check-docs.mjs            # docs-integrity gate (index, links, aliases)
@@ -98,6 +108,8 @@ is no CI ordering to mirror. The two are deliberately not the same set:
   *and* in the workflow's Examples Cross-Arch Build job (`examples-build`),
   off the same [`scripts/example-dirs.sh`](scripts/example-dirs.sh)
   enumeration, so the local gate and the hosted one cannot drift apart.
+  The same holds for the Rust crate: the last step of `make ci` is `make
+  rust-check`, which the workflow's Rust crate job (`rust`) runs too.
 - **Coverage floor** — the workflow's Unit Tests job runs
   `make test-coverage-check` and `make coverage-check` on top of the test run;
   `make ci` does not. Locally that floor belongs to `make check`.
@@ -170,6 +182,40 @@ the contract is [docs/specs/problems-package.md](docs/specs/problems-package.md)
   Rust crate).
 - Linux only at run time: other OSes get stubs that compile and do nothing.
 
+### Rust crate frostyard-problems (`rust/`)
+
+The Rust writer and validator of the same records
+([ADR-0003](docs/adr/0003-rust-crate-frostyard-problems-in-rust-folder.md);
+contract: the section "Rust crate" of
+[docs/specs/problems-package.md](docs/specs/problems-package.md)). `rust/`
+is its own cargo workspace root; `rust/Cargo.lock` is committed and every
+cargo command runs `--locked`.
+
+- **Rust standard library only, also in tests.** No `[dependencies]` table
+  of any kind; `make rust-check` fails unless `cargo tree` prints only the
+  crate, and a test fails on network type names in the sources. The v1
+  patterns are hand-written matchers in `rust/src/patterns.rs` that must
+  give exactly the result of the Go regular expressions in
+  `problems/problems.go`; change both together.
+- **API** — `Recorder::new(app_id, version, component)` (inert on a bad
+  identity, `err()` says why), `with_socket`, `error(code, Option<&dyn
+  Display>)` (formats `err` only when it can write, on Linux, inside
+  `catch_unwind`: a panicking `Display` gives the code as `MESSAGE`, and
+  the panic payload is leaked, not dropped),
+  `install_panic_hook(env!("CARGO_MANIFEST_DIR"))` (`#[track_caller]`;
+  records the panic FIRST, THEN
+  calls the previous hook; the crate's own work in the hook never panics,
+  but a previous hook that panics or blocks is outside that guarantee),
+  `map_location(crate_root, file, line)` (the "crate that installs the
+  hook" rule: only files under `<crate_root>src/`; the root is the longest
+  prefix of the caller file before a `src` folder that ends
+  `CARGO_MANIFEST_DIR`, else `""` only for a caller file with `src/` as its
+  only `src` folder, else none), `validate` (the rules of Go
+  `Validate`, frames included), `decode_entry`.
+- **Transport** — 1 `send_to` on a new non-blocking
+  `UnixDatagram::unbound()` on Linux; every error drops the record; the
+  rate cap is a process-wide static. Other OSes compile and write nothing.
+
 ## Conventions
 
 - Go 1.26; use modern Go syntax (range-over-int, omitzero, etc.)
@@ -205,6 +251,16 @@ the contract is [docs/specs/problems-package.md](docs/specs/problems-package.md)
   script for `Read`, every vector in `problems/testdata/vectors/v1.txt`, and
   a `GOOS=windows`/`GOOS=darwin` build (skipped with `-short`). Run with
   `go test ./problems/`.
+- **Rust crate tests** — `rust/src/tests/` (inside the crate, so they reach
+  the crate-private encoder, frame mapping and rate cap; standard test
+  harness only): every vector in `problems/testdata/vectors/v1.txt` (Rust
+  `write` vectors through a `UnixDatagram` test socket in a new folder under
+  the temporary folder), the matchers, `map_location`, the decoder, the
+  message cut, the rate cap with given instants, the hook order with a fake
+  sender and a fake previous hook, and the test binary run again as a helper
+  process (`--exact`, `FROSTYARD_PROBLEMS_TEST_HELPER`) for a real panic.
+  Tests that send records hold a static lock and reset the shared rate cap.
+  Run with `make rust-check` (or `cargo test --locked` in `rust/`).
 - **End-to-end** — [`tests/e2e/examples_test.go`](tests/e2e/examples_test.go)
   builds every `_examples/*` program with coverage instrumentation and runs it
   as a subprocess in `json`, `text`, `noop`, and an invalid format under a
@@ -243,7 +299,10 @@ leaves no diff, `go vet` over the module and the `_examples/` programs,
 scripts/check-docs.mjs` — every doc indexed in `docs/README.md`, every
 relative link resolving, every symlink alias intact, thresholds in
 [`.coverage-thresholds.json`](.coverage-thresholds.json), all `1.0`,
-`never_relax: true`), and **Release config** (`goreleaser check` over
+`never_relax: true`), **Rust crate** (`make rust-check` on the Rust
+toolchain that `mise.toml` pins, installed by `jdx/mise-action`: cargo fmt,
+clippy, tests, Windows and macOS check builds, no dependency), and
+**Release config** (`goreleaser check` over
 [`.goreleaser.yaml`](.goreleaser.yaml), so a broken release configuration
 fails pre-merge instead of after an immutable tag is pushed; it runs the
 GoReleaser Pro distribution at the same action SHA `release.yml` uses,

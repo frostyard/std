@@ -9,3 +9,6 @@ lockfile = true
 golangci-lint = "2.13.1"
 # svu reads .svu.yml only from v3 on; `make bump` refuses any other release.
 svu = "3.4.1"
+# The Rust crate frostyard-problems (rust/, ADR-0003): cargo fmt, clippy and
+# test, and a check build for the Windows and macOS targets (no-op stubs).
+rust = { version = "1.99.1", components = "clippy,rustfmt", targets = "x86_64-pc-windows-gnu,x86_64-apple-darwin" }

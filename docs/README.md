@@ -24,6 +24,10 @@ Org-wide decisions binding this repo are listed in [org-adrs.md](org-adrs.md).
   — stdlib only, 1 datagram and drop on overflow, a rate cap, inert on a bad
   identity, a reader that trusts only journald's fields, and the limits of
   `RecoverPanic` and `CrashOutput`
+- [0003 — The Rust crate frostyard-problems lives in rust/ of std](adr/0003-rust-crate-frostyard-problems-in-rust-folder.md)
+  — stdlib only, the panic hook records and then calls the previous hook,
+  the "crate that installs the hook" location rule, a no-op on other OSes, Rust pinned
+  in `mise.toml`, a cargo CI job, and a cargo git dependency on a std tag
 
 ### Design
 
@@ -40,7 +44,8 @@ Org-wide decisions binding this repo are listed in [org-adrs.md](org-adrs.md).
   formatting
 - [Problems package](specs/problems-package.md) — the `problems` API, the
   journal fields of a record, the transport rules, the crash-file format,
-  the reader rules, and the shared test vector format
+  the reader rules, the shared test vector format, and the Rust crate
+  `frostyard-problems` (`rust/`)
 - [PR review rubric](specs/pr-review-rubric.md) — the checklist every review
   applies, rows = the repo's verifiable gates (`docs/review-rubric.md` is its
   alias)

@@ -1,0 +1,18 @@
+# The Rust crate of the frostyard problem records (ADR-0003). This folder is
+# its own workspace root. The crate uses only the Rust standard library: a
+# test fails when this file names any other crate, and `make rust-check`
+# fails unless `cargo tree` prints only this crate.
+[package]
+name = "frostyard-problems"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.85"
+license = "MIT"
+publish = false
+repository = "https://github.com/frostyard/std"
+description = "Problem records (panics and coded errors) of a frostyard app in the local systemd journal"
+readme = "README.md"
+
+[lib]
+name = "frostyard_problems"
+path = "src/lib.rs"

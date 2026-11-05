@@ -6,7 +6,9 @@ name: CI
 # of what `make ci` mirrors), and a govulncheck security scan (pinned v1.7.0
 # — std is dependency-free, so this is the reachable standard-library
 # advisory signal every consumer inherits); docs-gate is the docs-integrity
-# check from ADR-0001. Actions are pinned by commit SHA with least-privilege
+# check from ADR-0001; the rust job checks the Rust crate frostyard-problems
+# in rust/ (ADR-0003) with `make rust-check`, on the Rust toolchain that
+# mise.toml pins. Actions are pinned by commit SHA with least-privilege
 # permissions (frostyard/core ADR-0021).
 #
 # The same jobs also run on the merge queue's temporary branches
@@ -227,6 +229,32 @@ jobs:
         run: |
           gofmt -l .
           test -z "$(gofmt -l .)"
+
+  rust:
+    name: Rust crate
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # mise.toml pins rust 1.99.1 with clippy, rustfmt and the Windows and
+      # macOS targets; mise.lock records the version, and rustup checks each
+      # download against the Rust channel manifest (core ADR-0043). The
+      # same pin serves `mise install` on a developer machine and a worker.
+      - name: Install the pinned Rust toolchain
+        uses: jdx/mise-action@6be3c7ed4c21d4f76b208d351d95aac273ebb76d # v5.2.4
+        with:
+          install: true
+          install_args: rust
+          cache: true
+
+      # cargo fmt, clippy, the tests (with the shared vectors in
+      # problems/testdata/vectors/), check builds for x86_64-pc-windows-gnu
+      # and x86_64-apple-darwin, and a cargo tree that holds only the crate.
+      - name: Check the Rust crate
+        run: make rust-check
 
   docs-gate:
     name: Docs integrity
