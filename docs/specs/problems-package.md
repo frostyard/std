@@ -138,9 +138,19 @@ an error with the exit status and at most 1024 bytes of stderr.
   live process owns the file: skip it. Else read at most 64 KiB, turn it
   into at most 1 record, and remove the file. At most 8 files are handled
   for each start (skipped files do not count).
-- Step 2, the own file: `os.CreateTemp(dir, "*.crash")`, `flock(LOCK_EX)`,
-  kept open for the life of the process, then the header line, then
-  `debug.SetCrashOutput(f, debug.CrashOptions{})`. Only the first successful
+- Step 1 also removes stale temporary files: for each `*.crash-new` file,
+  open it with `O_NOFOLLOW`; when it is at least 1 hour old (mtime) and
+  `flock(LOCK_EX|LOCK_NB)` succeeds, remove it with no record. It is never
+  read or parsed. A younger file can belong to a live process that has not
+  locked it yet, so it stays. At most 8 for each start.
+- Step 2, the own file: `os.CreateTemp(dir, "*.crash-new")` (a name that
+  step 1 never parses), `flock(LOCK_EX)`, the header line, then publish it:
+  `os.Link` to the same name with the `.crash` suffix (a link never replaces
+  an existing file; when the name is taken, start again with a new name, at
+  most 8 tries), and remove the `.crash-new` name. Only then
+  `debug.SetCrashOutput(f, debug.CrashOptions{})`. Thus a concurrent start
+  never sees an unlocked `*.crash` file of a live process. The file stays
+  open and locked for the life of the process. Only the first successful
   call in a process does this; a later call returns nil.
 - Header line: `frostyard-problems/1 app=<appID> version=<version> component=<component>\n`.
 - The marker line `frostyard-problems: recorded`: `RecoverPanic` appends it
@@ -148,14 +158,19 @@ an error with the exit status and at most 1024 bytes of stderr.
 - A leftover gives no record when: the header is not valid (4 fields, these
   keys, and an identity that `New` accepts), there is no `panic: ` or
   `fatal error: ` line, the first `goroutine N [...]:` block after it gives
-  no frame, or the file holds the marker line AND the first crash line is a
-  `panic: ` line that ends with ` [recovered, repanicked]` (the re-panic of a
-  panic that `RecoverPanic` recorded). A `fatal error: ` crash, or a
-  `panic: ` line without that suffix, gives 1 record even when the marker is
-  in the file.
+  no frame, or the file holds the marker line AND the first crash message is
+  a panic message whose last line ends with ` [recovered, repanicked]` (the
+  re-panic of a panic that `RecoverPanic` recorded). A `fatal error: `
+  crash, or a panic message without that suffix, gives 1 record even when
+  the marker is in the file.
+- Panic message: the first `panic: ` line plus the tab-indented
+  continuation lines that follow it directly. Go 1.26 prints a multi-line
+  panic value that way (`panic: first`, then a tab and
+  `second [recovered, repanicked]`), so the suffix is on the last line.
 - The record of a leftover: the identity of the header (the run that
-  crashed), class `panic`, `PRIORITY=2`, `MESSAGE` = the first `panic: ` or
-  `fatal error: ` line (cut to 2048 bytes), `FROSTYARD_FRAMES` = the
+  crashed), class `panic`, `PRIORITY=2`, `MESSAGE` = the panic message (its
+  lines joined by `\n`, the leading tabs removed) or the first
+  `fatal error: ` line, cut to 2048 bytes, `FROSTYARD_FRAMES` = the
   function lines of the first goroutine block (not the tab-indented file
   lines, not `created by` lines, not `...` lines), with the argument list
   `(...)` at the end removed, through `MapFrame`, at most 32.

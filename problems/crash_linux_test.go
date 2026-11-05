@@ -8,6 +8,7 @@ import (
 	"strings"
 	"syscall"
 	"testing"
+	"time"
 )
 
 const testApp = "org.frostyard.nsl"
@@ -337,4 +338,164 @@ func TestRecoverPanicCrashOutputSubprocess(t *testing.T) {
 		t.Fatalf("leftover run: exit code = %d; stderr:\n%s", code, stderr)
 	}
 	expectNone(t, c)
+}
+
+// TestCrashOutputCreateWindow runs a leftover scan of a concurrent start in
+// the window after the own crash file is created and before it is locked.
+// The scan must not remove the file of the live process.
+func TestCrashOutputCreateWindow(t *testing.T) {
+	sock, c := listen(t)
+	resetRate(t)
+	resetCrash(t)
+	clearStateEnv(t)
+	state := t.TempDir()
+	t.Setenv("STATE_DIRECTORY", state)
+	dir := filepath.Join(state, "frostyard-problems", testApp)
+	scans := 0
+	testAfterCreate = func(string) {
+		scans++
+		New(testApp, "1.0.0", ComponentCLI, WithSocket(sock)).processLeftovers(dir)
+	}
+	t.Cleanup(func() { testAfterCreate = nil })
+
+	if err := New(testApp, "1.0.0", ComponentCLI, WithSocket(sock)).CrashOutput(); err != nil {
+		t.Fatalf("CrashOutput = %v", err)
+	}
+	if scans == 0 {
+		t.Fatal("the hook did not run")
+	}
+	files := crashFiles(t, dir)
+	if len(files) != 1 {
+		t.Fatalf("crash files = %q, want the own file", files)
+	}
+	crash.mu.Lock()
+	own, err := crash.f.Stat()
+	crash.mu.Unlock()
+	if err != nil {
+		t.Fatal(err)
+	}
+	published, err := os.Stat(files[0])
+	if err != nil || !os.SameFile(own, published) {
+		t.Errorf("the published file %s is not the crash output file (%v)", files[0], err)
+	}
+	if m, _ := filepath.Glob(filepath.Join(dir, "*.crash-new")); len(m) != 0 {
+		t.Errorf("temporary files left: %q", m)
+	}
+	expectNone(t, c)
+}
+
+// TestStaleCrashNew checks that a *.crash-new file of a dead process is
+// removed with no record, and that a fresh or locked one stays.
+func TestStaleCrashNew(t *testing.T) {
+	sock, c := listen(t)
+	resetRate(t)
+	dir := t.TempDir()
+	old := time.Now().Add(-2 * time.Hour)
+
+	stale := filepath.Join(dir, "1.crash-new")
+	writeFile(t, stale, crashFixturePanic)
+	fresh := filepath.Join(dir, "2.crash-new")
+	writeFile(t, fresh, crashFixturePanic)
+	locked := filepath.Join(dir, "3.crash-new")
+	writeFile(t, locked, crashFixturePanic)
+	for _, p := range []string{stale, locked} {
+		if err := os.Chtimes(p, old, old); err != nil {
+			t.Fatal(err)
+		}
+	}
+	lf, err := os.Open(locked)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer lf.Close()
+	if err := syscall.Flock(int(lf.Fd()), syscall.LOCK_EX|syscall.LOCK_NB); err != nil {
+		t.Fatal(err)
+	}
+
+	New(testApp, "1.0.0", ComponentCLI, WithSocket(sock)).processLeftovers(dir)
+
+	if _, err := os.Stat(stale); !os.IsNotExist(err) {
+		t.Errorf("the stale .crash-new file is still there: %v", err)
+	}
+	for _, p := range []string{fresh, locked} {
+		if _, err := os.Stat(p); err != nil {
+			t.Errorf("%s was removed: %v", p, err)
+		}
+	}
+	expectNone(t, c) // a .crash-new file is never parsed
+}
+
+// TestRecoverPanicMultilineSubprocess: a recorded panic with a multi-line
+// value gives no second record from its crash file.
+func TestRecoverPanicMultilineSubprocess(t *testing.T) {
+	state := t.TempDir()
+	dir := filepath.Join(state, "frostyard-problems", testApp)
+	sock, c := listen(t)
+	env := []string{"STATE_DIRECTORY=" + state, "PROBLEMS_TEST_SOCKET=" + sock}
+
+	code, stderr := runHelper(t, "recover-crash-multiline", env...)
+	if code != 2 {
+		t.Fatalf("exit code = %d, want 2; stderr:\n%s", code, stderr)
+	}
+	if !strings.Contains(stderr, "panic: first\n\tsecond [recovered, repanicked]\n") {
+		t.Errorf("stderr does not hold the Go 1.26 multi-line re-panic:\n%s", stderr)
+	}
+	if rec := readRecord(t, c); rec["MESSAGE"] != "first\nsecond" {
+		t.Errorf("MESSAGE = %q", rec["MESSAGE"])
+	}
+	files := crashFiles(t, dir)
+	if len(files) != 1 {
+		t.Fatalf("crash files = %q, want 1", files)
+	}
+	data, _ := os.ReadFile(files[0])
+	if !strings.Contains(string(data), recordedMarker+"\n") || !strings.Contains(string(data), "\tsecond [recovered, repanicked]\n") {
+		t.Errorf("crash file = %q", data)
+	}
+
+	if code, stderr := runHelper(t, "leftover", env...); code != 0 {
+		t.Fatalf("leftover run: exit code = %d; stderr:\n%s", code, stderr)
+	}
+	expectNone(t, c)
+}
+
+// TestCreateCrashFileName covers a name that is taken at publish time, and a
+// temporary file that disappears.
+func TestCreateCrashFileName(t *testing.T) {
+	dir := t.TempDir()
+	r := New(testApp, "1.0.0", ComponentCLI)
+	t.Cleanup(func() { testAfterCreate = nil })
+
+	// The first name is taken once: the next try gets a new name.
+	taken := 0
+	testAfterCreate = func(tmp string) {
+		if taken == 0 {
+			writeFile(t, strings.TrimSuffix(tmp, crashNewSuffix)+crashSuffix, "")
+		}
+		taken++
+	}
+	f, err := r.createCrashFile(dir)
+	if err != nil {
+		t.Fatalf("createCrashFile = %v", err)
+	}
+	f.Close()
+	if taken != 2 {
+		t.Errorf("tries = %d, want 2", taken)
+	}
+
+	// Every name is taken.
+	testAfterCreate = func(tmp string) {
+		writeFile(t, strings.TrimSuffix(tmp, crashNewSuffix)+crashSuffix, "")
+	}
+	if _, err := r.createCrashFile(dir); err == nil {
+		t.Error("createCrashFile with every name taken: want an error")
+	}
+
+	// The temporary file disappears before it is published.
+	testAfterCreate = func(tmp string) { _ = os.Remove(tmp) }
+	if _, err := r.createCrashFile(dir); err == nil {
+		t.Error("createCrashFile with a removed temporary file: want an error")
+	}
+	if m, _ := filepath.Glob(filepath.Join(dir, "*"+crashNewSuffix)); len(m) != 0 {
+		t.Errorf("temporary files left: %q", m)
+	}
 }

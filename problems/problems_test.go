@@ -6,6 +6,7 @@ import (
 	"errors"
 	"os"
 	"reflect"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -20,6 +21,8 @@ func TestMain(m *testing.M) {
 		helperRecover(false)
 	case "recover-crash":
 		helperRecover(true)
+	case "recover-crash-multiline":
+		helperRecoverMultiline()
 	case "crash":
 		helperCrash()
 	case "leftover":
@@ -45,6 +48,15 @@ func helperRecover(crashOutput bool) {
 	}
 	defer r.RecoverPanic()
 	panickingHelper()
+}
+
+func helperRecoverMultiline() {
+	r := helperRecorder()
+	if err := r.CrashOutput(); err != nil {
+		os.Exit(4)
+	}
+	defer r.RecoverPanic()
+	panic("first\nsecond")
 }
 
 //go:noinline
@@ -250,7 +262,9 @@ func TestVectors(t *testing.T) {
 					t.Errorf("MapFrame(%q) = %q, want %q", v.get("in.frame"), got, want)
 				}
 			case "write":
-				if v.get("in.runtime") == "go" {
+				// The writer transport exists only on Linux; the
+				// validation below runs on every OS.
+				if v.get("in.runtime") == "go" && runtime.GOOS == "linux" {
 					runWriteVector(t, v)
 				}
 				if v.get("expect") == "ok" {

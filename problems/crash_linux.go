@@ -14,6 +14,11 @@ import (
 	"syscall"
 )
 
+// testAfterCreate, when not nil, runs after the own crash file is created
+// and before it is locked. Only tests set it, to run a concurrent leftover
+// scan in that window.
+var testAfterCreate func(string)
+
 // crash is the crash output state of the process: the own crash file, kept
 // open and locked for the life of the process.
 var crash struct {
@@ -27,7 +32,10 @@ var crash struct {
 // leftover crash file of a dead process into 1 record.
 //
 // The folder is $STATE_DIRECTORY (its first entry), else $XDG_STATE_HOME,
-// else $HOME/.local/state, then frostyard-problems/<appID>. Call it once,
+// else $HOME/.local/state, then frostyard-problems/<appID>. The own file is
+// created as <random>.crash-new, locked, given its header, and only then
+// published as <random>.crash, so that a concurrent start never sees an
+// unlocked *.crash file of a live process. Call it once,
 // early in main; a later call in the same process does nothing. On an inert
 // Recorder it returns Err and does nothing. A crash is recorded only at the
 // next start of the app.
@@ -49,21 +57,52 @@ func (r *Recorder) CrashOutput() error {
 	}
 	r.processLeftovers(dir)
 
-	f, err := os.CreateTemp(dir, "*.crash") // mode 0600
+	f, err := r.createCrashFile(dir)
 	if err != nil {
 		return err
-	}
-	if err := syscall.Flock(int(f.Fd()), syscall.LOCK_EX|syscall.LOCK_NB); err != nil {
-		return closeRemove(f, err)
-	}
-	if _, err := f.WriteString(crashHeader(r.appID, r.version, r.component)); err != nil {
-		return closeRemove(f, err)
 	}
 	if err := debug.SetCrashOutput(f, debug.CrashOptions{}); err != nil {
 		return closeRemove(f, err)
 	}
 	crash.f = f
 	return nil
+}
+
+// createCrashFile creates, locks and publishes the own crash file. The
+// file starts as <random>.crash-new, a name that the leftover scan does not
+// parse. Only after the lock is held and the header is written does it get
+// its *.crash name, by a hard link that never replaces an existing file.
+func (r *Recorder) createCrashFile(dir string) (*os.File, error) {
+	for range crashCreateTries {
+		f, err := os.CreateTemp(dir, "*"+crashNewSuffix) // mode 0600
+		if err != nil {
+			return nil, err
+		}
+		if testAfterCreate != nil {
+			testAfterCreate(f.Name())
+		}
+		if err := syscall.Flock(int(f.Fd()), syscall.LOCK_EX|syscall.LOCK_NB); err != nil {
+			return nil, closeRemove(f, err)
+		}
+		if _, err := f.WriteString(crashHeader(r.appID, r.version, r.component)); err != nil {
+			return nil, closeRemove(f, err)
+		}
+		tmp := f.Name()
+		final := strings.TrimSuffix(tmp, crashNewSuffix) + crashSuffix
+		err = os.Link(tmp, final)
+		_ = os.Remove(tmp)
+		if errors.Is(err, os.ErrExist) {
+			// A crash file with that name exists: try a new name.
+			_ = f.Close()
+			continue
+		}
+		if err != nil {
+			_ = f.Close()
+			return nil, err
+		}
+		return f, nil
+	}
+	return nil, errors.New("problems: no free crash file name")
 }
 
 func closeRemove(f *os.File, err error) error {
@@ -93,19 +132,52 @@ func crashDir(appID string) (string, error) {
 
 // processLeftovers turns up to 8 crash files of dead processes into
 // records, and removes them. A file that a live process holds locked is
-// skipped.
+// skipped. It also removes, with no record, each *.crash-new file that is
+// not locked and is older than crashNewStale: a process that died before it
+// published its crash file. A younger one can belong to a live process that
+// has not locked it yet.
 func (r *Recorder) processLeftovers(dir string) {
-	paths, _ := filepath.Glob(filepath.Join(dir, "*.crash"))
+	paths, _ := filepath.Glob(filepath.Join(dir, "*"+crashSuffix))
 	slices.Sort(paths)
 	done := 0
 	for _, p := range paths {
 		if done == crashMaxPerStart {
-			return
+			break
 		}
 		if r.processLeftover(p) {
 			done++
 		}
 	}
+	stale, _ := filepath.Glob(filepath.Join(dir, "*"+crashNewSuffix))
+	slices.Sort(stale)
+	done = 0
+	for _, p := range stale {
+		if done == crashMaxPerStart {
+			return
+		}
+		if removeStaleNew(p) {
+			done++
+		}
+	}
+}
+
+// removeStaleNew removes 1 *.crash-new file of a dead process. It never
+// reads the file.
+func removeStaleNew(path string) bool {
+	f, err := os.OpenFile(path, os.O_RDONLY|syscall.O_NOFOLLOW, 0)
+	if err != nil {
+		return false
+	}
+	defer f.Close()
+	fi, err := f.Stat()
+	if err != nil || now().Sub(fi.ModTime()) < crashNewStale {
+		return false
+	}
+	if err := syscall.Flock(int(f.Fd()), syscall.LOCK_EX|syscall.LOCK_NB); err != nil {
+		return false
+	}
+	_ = os.Remove(path)
+	return true
 }
 
 // processLeftover handles 1 crash file. It returns false when a live process

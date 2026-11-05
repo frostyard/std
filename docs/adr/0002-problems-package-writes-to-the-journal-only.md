@@ -64,10 +64,13 @@ std gets a package `github.com/frostyard/std/problems`, with the spec
   must be deferred directly, and it cannot catch a fatal error or `os.Exit`.
   `CrashOutput` covers the rest through `runtime/debug.SetCrashOutput`: a
   locked crash file for each process, turned into 1 record at the next start
-  only. A marker line in the crash file stops a second record for a panic
-  that `RecoverPanic` already recorded: a leftover gives no record only when
-  it holds the marker and its first `panic: ` line ends with
-  ` [recovered, repanicked]`.
+  only. The file gets its scanned `*.crash` name only after its lock is held
+  (it starts as `*.crash-new`), so a concurrent start cannot remove the file
+  of a live process. A marker line in the crash file stops a second record
+  for a panic that `RecoverPanic` already recorded: a leftover gives no
+  record only when it holds the marker and the last line of its first panic
+  message (Go prints a multi-line panic value as tab-indented continuation
+  lines) ends with ` [recovered, repanicked]`.
 
 ## Consequences
 

@@ -135,9 +135,10 @@ errors.
   catches everything else — panics of other goroutines and fatal errors —
   in a locked `*.crash` file that the next start turns into 1 record. A
   marker line keeps the 2 paths from recording 1 panic twice: a leftover is
-  skipped only when it holds the marker and its first `panic: ` line ends
-  with ` [recovered, repanicked]`, so a later fatal error or plain panic
-  still gives a record.
+  skipped only when it holds the marker and the last line of its first
+  panic message ends with ` [recovered, repanicked]`, so a later fatal
+  error or plain panic still gives a record. The own file is created as
+  `*.crash-new` and gets its scanned `*.crash` name only after it is locked.
 - **Reader.** `Read` runs `journalctl -o json --all` and `ParseJSON`
   validates each entry with `Validate`, the one validation path: journal
   records are untrusted, so a record that fails is dropped and counted, and

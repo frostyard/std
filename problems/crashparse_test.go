@@ -124,6 +124,11 @@ func TestParseCrashMarker(t *testing.T) {
 		{"later plain panic", crashFixtureHeader + marker + strings.TrimPrefix(crashFixturePanic, crashFixtureHeader), true, "panic: boom"},
 		// (c) A later fatal error.
 		{"later fatal error", crashFixtureHeader + marker + strings.TrimPrefix(crashFixtureFatal, crashFixtureHeader), true, "fatal error: concurrent map writes"},
+		// A multi-line panic value: Go 1.26 puts the suffix on the last,
+		// tab-indented, line.
+		{"multi-line re-panic", crashFixtureHeader + marker + "panic: first\n\tsecond [recovered, repanicked]\n\ngoroutine 1 [running]:\nmain.main()\n", false, ""},
+		{"multi-line plain panic", crashFixtureHeader + marker + "panic: g1\n\tg2\n\ngoroutine 7 [running]:\nmain.main.func1()\n", true, "panic: g1\ng2"},
+		{"multi-line re-panic without marker", crashFixtureHeader + "panic: first\n\tsecond [recovered, repanicked]\n\ngoroutine 1 [running]:\nmain.main()\n", true, "panic: first\nsecond [recovered, repanicked]"},
 		// A re-panic with no marker: RecoverPanic did not record it.
 		{"re-panic without marker", strings.Replace(crashFixtureRepanic, marker, "", 1), true, "panic: boom [recovered, repanicked]"},
 	}
