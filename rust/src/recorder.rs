@@ -2,12 +2,12 @@
 
 use std::any::Any;
 use std::fmt;
-use std::panic::{self, PanicHookInfo};
+use std::panic::{self, Location, PanicHookInfo};
 use std::path::{Path, PathBuf};
 
 use crate::journal::{encode_entry, truncate};
-use crate::location::map_location;
-use crate::patterns::{MAX_MESSAGE_LEN, is_app_id, is_code, is_semver};
+use crate::location::{crate_root, map_location};
+use crate::patterns::{MAX_MESSAGE_LEN, is_app_id, is_semver};
 use crate::rate::rate_allow;
 use crate::transport::send_datagram;
 use crate::{Component, DEFAULT_SOCKET, MESSAGE_ID, SCHEMA};
@@ -24,7 +24,8 @@ pub(crate) enum Status {
     DroppedRate,
     /// The recorder is inert.
     Inert,
-    /// An argument fails its pattern.
+    /// An argument fails its pattern (only `error` checks one, on Linux).
+    #[cfg(any(test, target_os = "linux"))]
     Invalid,
 }
 
@@ -102,10 +103,24 @@ impl Recorder {
     /// A code that fails `^[a-z][a-z0-9_.]{0,63}$` writes nothing. `MESSAGE`
     /// stays on the host; only the code can leave it. The call never blocks
     /// and never reports a failure to write.
+    ///
+    /// `err` is formatted only when a record can be written (a recorder that
+    /// is not inert, a valid code, on Linux). When its `Display` impl returns
+    /// an error or panics, `MESSAGE` is the code: the call catches the panic
+    /// (`std::panic::catch_unwind`) and returns normally. A panic hook still
+    /// sees that panic, so a hook from [`Recorder::install_panic_hook`] also
+    /// writes a `panic` record for it. With `panic = "abort"` a panicking
+    /// `Display` impl still aborts the process (the installed hook records
+    /// that panic first). On an OS other than Linux the call returns at once
+    /// and does not call `Display`.
     pub fn error(&self, code: &str, err: Option<&dyn fmt::Display>) {
+        #[cfg(target_os = "linux")]
         let _ = self.record_error(code, err, &send_datagram);
+        #[cfg(not(target_os = "linux"))]
+        let _ = (code, err);
     }
 
+    #[cfg(any(test, target_os = "linux"))]
     pub(crate) fn record_error(
         &self,
         code: &str,
@@ -115,36 +130,33 @@ impl Recorder {
         if self.err.is_some() {
             return Status::Inert;
         }
-        if !is_code(code) {
+        if !crate::patterns::is_code(code) {
             return Status::Invalid;
         }
         let msg = match err {
-            Some(err) => {
-                let mut msg = String::new();
-                // A Display impl that fails gives the code, not a panic.
-                if fmt::write(&mut msg, format_args!("{err}")).is_err() {
-                    msg = code.to_owned();
-                }
-                msg
-            }
+            Some(err) => error_text(err).unwrap_or_else(|| code.to_owned()),
             None => code.to_owned(),
         };
         self.emit("error", "3", &msg, Some(("FROSTYARD_CODE", code)), send)
     }
 
     /// Records a panic: class `panic`, `PRIORITY=2`, `MESSAGE` the panic
-    /// message, and `FROSTYARD_LOCATION` when [`map_location`] maps the raw
-    /// location.
+    /// message, and `FROSTYARD_LOCATION` when there is a crate root and
+    /// [`map_location`] maps the raw location with it.
     pub(crate) fn record_panic(
         &self,
         msg: &str,
+        root: Option<&str>,
         location: Option<(&str, u32)>,
         send: Sender<'_>,
     ) -> Status {
         if self.err.is_some() {
             return Status::Inert;
         }
-        let location = location.and_then(|(file, line)| map_location(file, line));
+        let location = match (root, location) {
+            (Some(root), Some((file, line))) => map_location(root, file, line),
+            _ => None,
+        };
         let last = location.as_deref().map(|l| ("FROSTYARD_LOCATION", l));
         self.emit("panic", "2", msg, last, send)
     }
@@ -193,19 +205,37 @@ impl Recorder {
     /// `Box<dyn Any>`, and `FROSTYARD_LOCATION` when [`map_location`] maps
     /// the panic location), THEN calls the previous hook with the same
     /// [`PanicHookInfo`], so the usual panic output and any other hook still
-    /// run. The hook itself never panics. An inert recorder installs the hook
-    /// too: it records nothing and still calls the previous hook.
+    /// run. An inert recorder installs the hook too: it records nothing and
+    /// still calls the previous hook.
+    ///
+    /// The location rule is "the crate that installs the hook". The function
+    /// is `#[track_caller]`: it reads the file of its caller
+    /// ([`std::panic::Location::caller`], for example `src/main.rs` or
+    /// `src-tauri/src/main.rs`) and keeps the part before the first `src`
+    /// component as the crate root (`""` or `src-tauri/`). A panic gets a
+    /// location only in a file under `<crate root>src/`. When the caller file
+    /// is absolute, holds a `\` or a `:`, or has no `src` component, no panic
+    /// of the process gets a location. So call it directly in the app's own
+    /// crate (in `main`), not through a helper in another crate.
+    ///
+    /// The work of this crate in the hook never panics: no unwrap, no
+    /// indexing that can fail, and a poisoned lock is used as is. That
+    /// guarantee does not cover the previous hook: a previous hook that
+    /// panics aborts the process (a panic inside a panic hook aborts), and a
+    /// previous hook that blocks blocks the panicking thread.
     ///
     /// Call it once, early in `main`. A hook that another library sets later
     /// replaces this one unless it chains to it the same way. With
     /// `panic = "abort"`, the hook still runs before the process aborts.
     /// Like [`std::panic::take_hook`], it panics when it is called from a
     /// panicking thread.
+    #[track_caller]
     pub fn install_panic_hook(&self) {
+        let root = crate_root(Location::caller().file());
         let prev = panic::take_hook();
         let rec = self.clone();
         panic::set_hook(Box::new(move |info| {
-            on_panic(&rec, info, &send_datagram, &|| prev(info));
+            on_panic(&rec, root.as_deref(), info, &send_datagram, &|| prev(info));
         }));
     }
 }
@@ -241,8 +271,30 @@ pub(crate) fn payload_text(payload: &(dyn Any + Send)) -> &str {
     }
 }
 
-/// The body of the panic hook: record first, then the previous hook.
-pub(crate) fn on_panic(rec: &Recorder, info: &dyn PanicView, send: Sender<'_>, prev: &dyn Fn()) {
-    let _ = rec.record_panic(info.message(), info.raw_location(), send);
+/// The body of the panic hook with the crate root `root`: record first,
+/// then the previous hook. Tests run it with a given root.
+pub(crate) fn on_panic(
+    rec: &Recorder,
+    root: Option<&str>,
+    info: &dyn PanicView,
+    send: Sender<'_>,
+    prev: &dyn Fn(),
+) {
+    let _ = rec.record_panic(info.message(), root, info.raw_location(), send);
     prev();
+}
+
+/// The `Display` text of `err`, or `None` when its `Display` impl returns an
+/// error or panics. A panic is caught here, so it never unwinds into the
+/// app from [`Recorder::error`].
+#[cfg(any(test, target_os = "linux"))]
+pub(crate) fn error_text(err: &dyn fmt::Display) -> Option<String> {
+    panic::catch_unwind(panic::AssertUnwindSafe(|| {
+        let mut msg = String::new();
+        fmt::write(&mut msg, format_args!("{err}"))
+            .ok()
+            .map(|()| msg)
+    }))
+    .ok()
+    .flatten()
 }

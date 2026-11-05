@@ -78,7 +78,7 @@ fn inert_recorder_writes_nothing() {
     for rec in [bad_app, bad_version] {
         assert_eq!(rec.record_error("x", None, &cap.send()), Status::Inert);
         assert_eq!(
-            rec.record_panic("boom", Some(("src/main.rs", 1)), &cap.send()),
+            rec.record_panic("boom", Some(""), Some(("src/main.rs", 1)), &cap.send()),
             Status::Inert
         );
     }
@@ -138,6 +138,27 @@ fn failing_display_gives_the_code() {
     assert_eq!(cap.field(0, "MESSAGE").as_deref(), Some("x.y"));
 }
 
+/// A Display impl that panics.
+struct Panicking;
+
+impl fmt::Display for Panicking {
+    fn fmt(&self, _: &mut fmt::Formatter<'_>) -> fmt::Result {
+        panic!("display boom")
+    }
+}
+
+#[test]
+fn panicking_display_gives_the_code() {
+    let _guard = send_guard();
+    let cap = Capture::new();
+    assert_eq!(
+        nsl().record_error("x.y", Some(&Panicking), &cap.send()),
+        Status::Sent
+    );
+    assert_eq!(cap.len(), 1);
+    assert_eq!(cap.field(0, "MESSAGE").as_deref(), Some("x.y"));
+}
+
 #[test]
 fn message_is_cut_on_a_char_boundary() {
     let _guard = send_guard();
@@ -149,7 +170,10 @@ fn message_is_cut_on_a_char_boundary() {
         Status::Sent
     );
     assert_eq!(cap.field(0, "MESSAGE"), Some(a.clone()));
-    assert_eq!(nsl().record_panic(&msg, None, &cap.send()), Status::Sent);
+    assert_eq!(
+        nsl().record_panic(&msg, Some(""), None, &cap.send()),
+        Status::Sent
+    );
     assert_eq!(cap.field(1, "MESSAGE"), Some(a));
 }
 
@@ -158,19 +182,26 @@ fn panic_record_fields() {
     let _guard = send_guard();
     let cap = Capture::new();
     let rec = nsl();
+    let tauri = Some("src-tauri/");
+    let bridge = Some(("src-tauri/src/bridge.rs", 88));
     assert_eq!(
-        rec.record_panic("boom", Some(("src-tauri/src/bridge.rs", 88)), &cap.send()),
+        rec.record_panic("boom", tauri, bridge, &cap.send()),
+        Status::Sent
+    );
+    let std_file = Some(("/rustc/abc/library/core/src/option.rs", 2000));
+    assert_eq!(
+        rec.record_panic("boom", tauri, std_file, &cap.send()),
         Status::Sent
     );
     assert_eq!(
-        rec.record_panic(
-            "boom",
-            Some(("/rustc/abc/library/core/src/option.rs", 2000)),
-            &cap.send()
-        ),
+        rec.record_panic("boom", tauri, None, &cap.send()),
         Status::Sent
     );
-    assert_eq!(rec.record_panic("boom", None, &cap.send()), Status::Sent);
+    // No crate root: no location, also for a file of the app.
+    assert_eq!(
+        rec.record_panic("boom", None, bridge, &cap.send()),
+        Status::Sent
+    );
     assert_eq!(
         cap.field(0, "FROSTYARD_LOCATION").as_deref(),
         Some("src/bridge.rs:88")
@@ -178,7 +209,7 @@ fn panic_record_fields() {
     assert_eq!(cap.field(0, "PRIORITY").as_deref(), Some("2"));
     assert_eq!(cap.field(0, "FROSTYARD_CLASS").as_deref(), Some("panic"));
     assert_eq!(cap.field(0, "FROSTYARD_RUNTIME").as_deref(), Some("rust"));
-    for i in 1..3 {
+    for i in 1..4 {
         assert_eq!(cap.field(i, "FROSTYARD_LOCATION"), None, "record {i}");
     }
     for b in cap.0.borrow().iter() {
@@ -206,7 +237,7 @@ fn rate_cap_of_the_process() {
     // The cap is shared by all recorders.
     assert_eq!(a.record_error("x", None, &cap.send()), Status::DroppedRate);
     assert_eq!(
-        b.record_panic("boom", None, &cap.send()),
+        b.record_panic("boom", Some(""), None, &cap.send()),
         Status::DroppedRate
     );
     assert_eq!(cap.len(), 10);
@@ -259,12 +290,20 @@ fn hook_records_before_the_previous_hook() {
         message: "boom",
         location: Some(("src/main.rs", 9)),
     };
-    on_panic(&nsl(), &info, &send, &prev);
+    on_panic(&nsl(), Some(""), &info, &send, &prev);
+    // Another crate root: the record has no location.
+    on_panic(&nsl(), Some("src-tauri/"), &info, &send, &prev);
     let inert = Recorder::new("org.example.app", "1.2.3", Component::Cli);
-    on_panic(&inert, &info, &send, &prev);
+    on_panic(&inert, Some(""), &info, &send, &prev);
     assert_eq!(
         events.into_inner(),
-        vec!["record boom src/main.rs:9", "previous", "previous"]
+        vec![
+            "record boom src/main.rs:9",
+            "previous",
+            "record boom -",
+            "previous",
+            "previous"
+        ]
     );
 }
 
@@ -298,6 +337,24 @@ mod transport {
         assert_eq!(got.len(), 1);
         let fields = decode_entry(&got[0]).expect("decode");
         assert_eq!(fields.get("MESSAGE").map(String::as_str), Some("disk full"));
+    }
+
+    /// `error()` returns normally after a panic in `Display`, and writes 1
+    /// record with the code as `MESSAGE`.
+    #[test]
+    fn error_with_panicking_display_returns() {
+        let _guard = send_guard();
+        let sock = TestSocket::new();
+        nsl()
+            .with_socket(&sock.path)
+            .error("store.write", Some(&super::Panicking));
+        let got = sock.recv_all();
+        assert_eq!(got.len(), 1);
+        let fields = decode_entry(&got[0]).expect("decode");
+        assert_eq!(
+            fields.get("MESSAGE").map(String::as_str),
+            Some("store.write")
+        );
     }
 
     #[test]

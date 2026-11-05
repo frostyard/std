@@ -1,82 +1,76 @@
-//! The location rule of a Rust panic: "our crates only".
+//! The location rule of a Rust panic: "the crate that installs the hook".
 
 use crate::patterns::{MAX_LOCATION_LEN, is_location};
 
-/// Maps the file and line of a panic location to the value of
-/// `FROSTYARD_LOCATION`, or `None` when the location must not leave the app.
+/// Derives the crate root from the file of the code that installs the panic
+/// hook: the relative prefix before its first `src` path component (`""` for
+/// `src/main.rs`, `src-tauri/` for `src-tauri/src/main.rs`).
 ///
-/// The rule is "our crates only". It returns `Some("src/<rest>:<line>")` only
-/// when all of these are true:
-///
-/// - `file` is a relative path: it does not start with `/`, and it holds no
-///   `\` and no `:`.
-/// - A path component of `file` is exactly `src`. The result starts at the
-///   first such component: `src-tauri/src/sync/imap.rs` gives
-///   `src/sync/imap.rs`.
-/// - No component before that `src` looks like a cargo
-///   `<name>-<major>.<minor>.<patch>` folder (for example `serde-1.0.219`),
-///   the folder of a registry, vendored or `trim-paths` dependency.
-/// - The result matches the v1 location pattern
-///   `^src/([a-z0-9_]+/){0,8}[a-z0-9_]+\.rs:[1-9][0-9]{0,5}$` and is at most
-///   128 bytes.
-///
-/// Why this works: cargo gives rustc the source path of a workspace member
-/// relative to the workspace root, so `file!()` and a panic location of the
-/// app's own crates are relative. Dependencies from crates.io, git and a
-/// vendor folder (for example a Flatpak build) get an absolute path, and the
-/// standard library gets `/rustc/<hash>/library/...`. All of those give
-/// `None`, so no path of the build host and no file of another crate reach a
-/// record.
-///
-/// Limits: the rule sees only the path. A path dependency inside the
-/// workspace counts as one of our crates; a workspace folder named like
-/// `<name>-1.2.3` before `src` hides the location; `--remap-path-prefix` or
-/// `trim-paths` that make other paths relative to a folder with no version
-/// in its name can let such a path through; and a location outside a `src`
-/// folder (for example `build.rs`, `tests/` or `benches/`) gives `None`.
-pub fn map_location(file: &str, line: u32) -> Option<String> {
-    if file.starts_with('/') || file.contains('\\') || file.contains(':') {
+/// It returns `None` when `caller_file` is absolute, holds a `\` or a `:`,
+/// or has no `src` folder. Then no panic of the process gets a location.
+pub(crate) fn crate_root(caller_file: &str) -> Option<String> {
+    if !is_relative(caller_file) {
         return None;
     }
     let mut offset = 0;
-    for part in file.split('/') {
-        if part == "src" {
-            let out = format!("{}:{line}", file.get(offset..)?);
-            return (out.len() <= MAX_LOCATION_LEN && is_location(&out)).then_some(out);
-        }
-        if is_crate_folder(part) {
-            return None;
+    for part in caller_file.split('/') {
+        // A folder named src: the file name itself does not count.
+        let is_folder = caller_file
+            .get(offset + part.len()..)
+            .is_some_and(|rest| rest.starts_with('/'));
+        if part == "src" && is_folder {
+            return caller_file.get(..offset).map(str::to_owned);
         }
         offset += part.len() + 1;
     }
     None
 }
 
-/// Reports whether `part` looks like a cargo `<name>-<major>.<minor>.<patch>`
-/// folder: a `-` after a non-empty name, then 3 dot-separated numbers, then
-/// the end or a `-` (prerelease) or `+` (build metadata).
-fn is_crate_folder(part: &str) -> bool {
-    part.match_indices('-')
-        .any(|(i, _)| i > 0 && part.get(i + 1..).is_some_and(starts_with_version))
+/// A relative path in the form that cargo gives a workspace member: no
+/// leading `/`, no `\` and no `:` (no Windows path, no drive letter).
+fn is_relative(file: &str) -> bool {
+    !(file.starts_with('/') || file.contains('\\') || file.contains(':'))
 }
 
-fn starts_with_version(v: &str) -> bool {
-    let b = v.as_bytes();
-    let mut i = 0;
-    for k in 0..3 {
-        let start = i;
-        while b.get(i).is_some_and(u8::is_ascii_digit) {
-            i += 1;
-        }
-        if i == start {
-            return false;
-        }
-        if k < 2 {
-            if b.get(i) != Some(&b'.') {
-                return false;
-            }
-            i += 1;
-        }
+/// Maps the file and line of a panic location to the value of
+/// `FROSTYARD_LOCATION`, or `None` when the location must not leave the app.
+///
+/// The rule is "the crate that installs the hook". `crate_root` is the
+/// relative folder of that crate in the cargo workspace: `""` when the crate
+/// is the workspace root, else a prefix that ends with `/` (for example
+/// `src-tauri/`). [`crate::Recorder::install_panic_hook`] derives it from the
+/// file of its caller. The function returns `Some("src/<rest>:<line>")` only
+/// when all of these are true:
+///
+/// - `crate_root` is `""` or ends with `/`.
+/// - `file` is a relative path: it does not start with `/`, and it holds no
+///   `\` and no `:`.
+/// - `file` starts exactly with `crate_root` followed by `src/`: the file is
+///   in the `src` folder of that crate.
+/// - The result `src/<rest>:<line>` matches the v1 location pattern
+///   `^src/([a-z0-9_]+/){0,8}[a-z0-9_]+\.rs:[1-9][0-9]{0,5}$` and is at most
+///   128 bytes.
+///
+/// Why this works: cargo gives rustc the source path of a workspace member
+/// relative to the workspace root, so the files of the app's crate all start
+/// with the same prefix as the file that installs the hook. Dependencies from
+/// crates.io, git and a vendor folder get an absolute path, and the standard
+/// library gets `/rustc/<hash>/library/...`. A relative path of another
+/// crate (another workspace member, `vendor/<crate>/src/...` inside the
+/// workspace, or `library/core/src/...` after a path remapping) does not
+/// start with `<crate_root>src/`. So only the files of the app's own crate
+/// reach a record.
+///
+/// Limits: other crates of the same workspace get no location; a panic in a
+/// file of the app's crate outside `src/` (`build.rs`, `tests/`, `benches/`)
+/// gets none; and when a path remapping (`--remap-path-prefix`,
+/// `trim-paths`) makes the app's paths absolute or changes their prefix, no
+/// panic gets a location.
+pub fn map_location(crate_root: &str, file: &str, line: u32) -> Option<String> {
+    if !(crate_root.is_empty() || crate_root.ends_with('/')) || !is_relative(file) {
+        return None;
     }
-    matches!(b.get(i), None | Some(b'-' | b'+'))
+    let rest = file.strip_prefix(crate_root)?.strip_prefix("src/")?;
+    let out = format!("src/{rest}:{line}");
+    (out.len() <= MAX_LOCATION_LEN && is_location(&out)).then_some(out)
 }

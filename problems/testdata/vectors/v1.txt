@@ -137,6 +137,7 @@ in.component: gui
 in.runtime: rust
 in.class: panic
 in.message: called `Option::unwrap()` on a `None` value
+in.crate_root:
 in.location: src/sync/imap.rs:214
 journal.MESSAGE_ID: 8915bdd215c84cbab0c31c05a1a33e7e
 journal.PRIORITY: 2
@@ -211,7 +212,7 @@ payload.class: error
 payload.code: store.open
 expect: ok
 
-# in.location is the raw location; a workspace member in src-tauri/ maps to the part from the first src component.
+# The hook was installed from src-tauri/src/main.rs, so the crate root is src-tauri/: a file of that crate maps to the part from its src folder.
 vector: rust-panic-src-tauri
 type: write
 in.app_id: org.frostyard.Frostread
@@ -220,6 +221,7 @@ in.component: gui
 in.runtime: rust
 in.class: panic
 in.message: index out of bounds: the len is 3 but the index is 7
+in.crate_root: src-tauri/
 in.location: src-tauri/src/bridge.rs:88
 journal.MESSAGE_ID: 8915bdd215c84cbab0c31c05a1a33e7e
 journal.PRIORITY: 2
@@ -248,6 +250,7 @@ in.component: gui
 in.runtime: rust
 in.class: panic
 in.message: invalid type: map, expected a string
+in.crate_root:
 in.location: /home/u/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.219/src/de/mod.rs:120
 journal.MESSAGE_ID: 8915bdd215c84cbab0c31c05a1a33e7e
 journal.PRIORITY: 2
@@ -274,6 +277,7 @@ in.component: gui
 in.runtime: rust
 in.class: panic
 in.message: called `Option::unwrap()` on a `None` value
+in.crate_root:
 in.location: /rustc/17067e9ac6d7e98f18d4d3a5b4ea0dcd2e1e8a3a/library/core/src/option.rs:2000
 journal.MESSAGE_ID: 8915bdd215c84cbab0c31c05a1a33e7e
 journal.PRIORITY: 2
@@ -291,7 +295,7 @@ payload.component: gui
 payload.class: panic
 expect: ok
 
-# A dependency path that trim-paths made relative (a name-<version> folder before src): no FROSTYARD_LOCATION.
+# A dependency path that trim-paths made relative: it is not under the src folder of the crate root, so no FROSTYARD_LOCATION.
 vector: rust-panic-trim-paths-dependency
 type: write
 in.app_id: org.frostyard.Frostmail
@@ -300,7 +304,116 @@ in.component: gui
 in.runtime: rust
 in.class: panic
 in.message: boom
+in.crate_root:
 in.location: serde-1.0.219/src/de.rs:10
+journal.MESSAGE_ID: 8915bdd215c84cbab0c31c05a1a33e7e
+journal.PRIORITY: 2
+journal.MESSAGE: boom
+journal.FROSTYARD_SCHEMA: frostyard.problem/1
+journal.FROSTYARD_APP_ID: org.frostyard.Frostmail
+journal.FROSTYARD_APP_VERSION: 2.0.1
+journal.FROSTYARD_RUNTIME: rust
+journal.FROSTYARD_COMPONENT: gui
+journal.FROSTYARD_CLASS: panic
+payload.app_id: org.frostyard.Frostmail
+payload.app_version: 2.0.1
+payload.runtime: rust
+payload.component: gui
+payload.class: panic
+expect: ok
+
+# A crate in a vendor folder inside the workspace: not under the src folder of the crate root, so no FROSTYARD_LOCATION.
+vector: rust-panic-vendor-folder
+type: write
+in.app_id: org.frostyard.Frostmail
+in.version: 2.0.1
+in.component: gui
+in.runtime: rust
+in.class: panic
+in.message: boom
+in.crate_root:
+in.location: vendor/serde/src/de.rs:10
+journal.MESSAGE_ID: 8915bdd215c84cbab0c31c05a1a33e7e
+journal.PRIORITY: 2
+journal.MESSAGE: boom
+journal.FROSTYARD_SCHEMA: frostyard.problem/1
+journal.FROSTYARD_APP_ID: org.frostyard.Frostmail
+journal.FROSTYARD_APP_VERSION: 2.0.1
+journal.FROSTYARD_RUNTIME: rust
+journal.FROSTYARD_COMPONENT: gui
+journal.FROSTYARD_CLASS: panic
+payload.app_id: org.frostyard.Frostmail
+payload.app_version: 2.0.1
+payload.runtime: rust
+payload.component: gui
+payload.class: panic
+expect: ok
+
+# The standard library after a path remapping made it relative: no FROSTYARD_LOCATION.
+vector: rust-panic-remapped-std
+type: write
+in.app_id: org.frostyard.Frostmail
+in.version: 2.0.1
+in.component: gui
+in.runtime: rust
+in.class: panic
+in.message: boom
+in.crate_root:
+in.location: library/core/src/option.rs:10
+journal.MESSAGE_ID: 8915bdd215c84cbab0c31c05a1a33e7e
+journal.PRIORITY: 2
+journal.MESSAGE: boom
+journal.FROSTYARD_SCHEMA: frostyard.problem/1
+journal.FROSTYARD_APP_ID: org.frostyard.Frostmail
+journal.FROSTYARD_APP_VERSION: 2.0.1
+journal.FROSTYARD_RUNTIME: rust
+journal.FROSTYARD_COMPONENT: gui
+journal.FROSTYARD_CLASS: panic
+payload.app_id: org.frostyard.Frostmail
+payload.app_version: 2.0.1
+payload.runtime: rust
+payload.component: gui
+payload.class: panic
+expect: ok
+
+# Another crate of the workspace (src-tauri/) when the hook was installed from src/: no FROSTYARD_LOCATION.
+vector: rust-panic-other-workspace-crate
+type: write
+in.app_id: org.frostyard.Frostmail
+in.version: 2.0.1
+in.component: gui
+in.runtime: rust
+in.class: panic
+in.message: boom
+in.crate_root:
+in.location: src-tauri/src/bridge.rs:88
+journal.MESSAGE_ID: 8915bdd215c84cbab0c31c05a1a33e7e
+journal.PRIORITY: 2
+journal.MESSAGE: boom
+journal.FROSTYARD_SCHEMA: frostyard.problem/1
+journal.FROSTYARD_APP_ID: org.frostyard.Frostmail
+journal.FROSTYARD_APP_VERSION: 2.0.1
+journal.FROSTYARD_RUNTIME: rust
+journal.FROSTYARD_COMPONENT: gui
+journal.FROSTYARD_CLASS: panic
+payload.app_id: org.frostyard.Frostmail
+payload.app_version: 2.0.1
+payload.runtime: rust
+payload.component: gui
+payload.class: panic
+expect: ok
+
+# A file under src/ when the crate root is src-tauri/: another crate, so no FROSTYARD_LOCATION.
+vector: rust-panic-outside-crate-root
+type: write
+in.app_id: org.frostyard.Frostmail
+in.version: 2.0.1
+in.component: gui
+in.runtime: rust
+in.class: panic
+in.message: boom
+in.crate_root: src-tauri/
+in.location: src/main.rs:5
 journal.MESSAGE_ID: 8915bdd215c84cbab0c31c05a1a33e7e
 journal.PRIORITY: 2
 journal.MESSAGE: boom

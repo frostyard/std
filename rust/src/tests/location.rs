@@ -1,24 +1,51 @@
-//! `map_location`: the "our crates only" rule.
+//! `map_location` and the crate root: the "crate that installs the hook"
+//! rule.
 
+use crate::location::crate_root;
 use crate::map_location;
 
 #[test]
-fn our_crates() {
+fn root_from_the_caller_file() {
     let cases = [
-        ("src/main.rs", 12, "src/main.rs:12"),
-        ("src/sync/imap.rs", 214, "src/sync/imap.rs:214"),
-        ("src-tauri/src/sync/imap.rs", 7, "src/sync/imap.rs:7"),
-        ("src-tauri/src/bridge.rs", 88, "src/bridge.rs:88"),
-        ("crates/core/src/lib.rs", 1, "src/lib.rs:1"),
-        ("src/a/src/b.rs", 3, "src/a/src/b.rs:3"),
-        ("./src/main.rs", 5, "src/main.rs:5"),
-        ("src/main.rs", 999_999, "src/main.rs:999999"),
+        ("src/main.rs", Some("")),
+        ("src-tauri/src/main.rs", Some("src-tauri/")),
+        ("src/bin/x.rs", Some("")),
+        ("crates/app/src/main.rs", Some("crates/app/")),
+        ("src/a/src/b.rs", Some("")),
+        ("/abs/src/main.rs", None),
+        ("/rustc/abc/library/std/src/panicking.rs", None),
+        ("examples/x.rs", None),
+        ("build.rs", None),
+        ("src", None),
+        ("src\\main.rs", None),
+        ("C:/app/src/main.rs", None),
+        ("", None),
     ];
-    for (file, line, want) in cases {
+    for (file, want) in cases {
+        assert_eq!(crate_root(file).as_deref(), want, "crate_root({file:?})");
+    }
+}
+
+#[test]
+fn files_of_the_crate() {
+    let cases = [
+        ("", "src/main.rs", 12, "src/main.rs:12"),
+        ("", "src/sync/imap.rs", 214, "src/sync/imap.rs:214"),
+        (
+            "src-tauri/",
+            "src-tauri/src/bridge.rs",
+            88,
+            "src/bridge.rs:88",
+        ),
+        ("crates/app/", "crates/app/src/lib.rs", 1, "src/lib.rs:1"),
+        ("", "src/a/src/b.rs", 3, "src/a/src/b.rs:3"),
+        ("", "src/main.rs", 999_999, "src/main.rs:999999"),
+    ];
+    for (root, file, line, want) in cases {
         assert_eq!(
-            map_location(file, line).as_deref(),
+            map_location(root, file, line).as_deref(),
             Some(want),
-            "map_location({file:?}, {line})"
+            "map_location({root:?}, {file:?}, {line})"
         );
     }
 }
@@ -26,46 +53,59 @@ fn our_crates() {
 #[test]
 fn other_files_give_none() {
     let long = format!("src/{}.rs", "a".repeat(120));
-    let cases: [(&str, u32); 22] = [
+    let cases: [(&str, &str, u32); 28] = [
         // Absolute: crates.io, git and vendored dependencies, std.
         (
+            "",
             "/home/u/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.219/src/de/mod.rs",
             120,
         ),
-        ("/home/u/.cargo/git/checkouts/foo-1a2b/abc123/src/lib.rs", 1),
         (
+            "",
+            "/home/u/.cargo/git/checkouts/foo-1a2b/abc123/src/lib.rs",
+            1,
+        ),
+        (
+            "",
             "/rustc/0123456789abcdef0123456789abcdef01234567/library/core/src/option.rs",
             2000,
         ),
-        ("/app/src/main.rs", 1),
-        // trim-paths and vendored folders with a version.
-        ("serde-1.0.219/src/de.rs", 10),
-        ("vendor/serde-1.0.219/src/de.rs", 10),
-        ("tokio-macros-2.5.0/src/lib.rs", 1),
-        ("foo-1.0.0-rc.1/src/lib.rs", 1),
-        ("foo-1.0.0+meta/src/lib.rs", 1),
+        ("", "/app/src/main.rs", 1),
+        // Relative paths of other crates.
+        ("", "vendor/serde/src/de.rs", 10),
+        ("", "library/core/src/option.rs", 10),
+        ("", "serde-1.0.219/src/de.rs", 10),
+        ("", "src-tauri/src/bridge.rs", 88),
+        ("", "crates/core/src/lib.rs", 1),
+        ("src-tauri/", "src/main.rs", 5),
+        ("src-tauri/", "vendor/serde/src/de.rs", 10),
+        ("src-tauri/", "src-tauri/vendor/x/src/a.rs", 1),
+        ("src-tauri/", "other/src-tauri/src/a.rs", 1),
+        ("", "./src/main.rs", 5),
+        // A root that is not "" and does not end with '/'.
+        ("src-tauri", "src-tauri/src/main.rs", 1),
+        ("src-tauri", "src-taurisrc/main.rs", 1),
         // Windows-like paths.
-        ("src\\main.rs", 1),
-        ("C:\\Users\\u\\app\\src\\main.rs", 1),
-        ("C:/Users/u/app/src/main.rs", 1),
+        ("", "src\\main.rs", 1),
+        ("", "C:\\Users\\u\\app\\src\\main.rs", 1),
+        ("C:/app/", "C:/app/src/main.rs", 1),
         // Lines out of the pattern.
-        ("src/main.rs", 0),
-        ("src/main.rs", 1_000_000),
+        ("", "src/main.rs", 0),
+        ("", "src/main.rs", 1_000_000),
         // Other shapes.
-        ("src/Main.rs", 1),
-        ("src/UI/main.rs", 1),
-        ("src/main.go", 1),
-        ("build.rs", 1),
-        ("tests/it.rs", 1),
-        ("source/main.rs", 1),
-        ("src", 1),
-        (long.as_str(), 1),
+        ("", "src/Main.rs", 1),
+        ("", "src/UI/main.rs", 1),
+        ("", "src/main.go", 1),
+        ("", "build.rs", 1),
+        ("", "tests/it.rs", 1),
+        ("", "src", 1),
+        ("", long.as_str(), 1),
     ];
-    for (file, line) in cases {
+    for (root, file, line) in cases {
         assert_eq!(
-            map_location(file, line),
+            map_location(root, file, line),
             None,
-            "map_location({file:?}, {line})"
+            "map_location({root:?}, {file:?}, {line})"
         );
     }
 }
@@ -75,26 +115,13 @@ fn length_limit() {
     // "src/" + 119 + ".rs" + ":1" = 128 bytes: kept; 129 bytes (a longer
     // line or name): dropped.
     let at = |n: usize| format!("src/{}.rs", "a".repeat(n));
-    assert!(map_location(&at(119), 1).is_some());
-    assert_eq!(map_location(&at(119), 1).map(|s| s.len()), Some(128));
-    assert_eq!(map_location(&at(119), 10), None);
-    assert_eq!(map_location(&at(120), 1), None);
-}
-
-#[test]
-fn version_like_names_after_src_do_not_count() {
-    // Only folders before the first src component are checked.
+    assert_eq!(map_location("", &at(119), 1).map(|s| s.len()), Some(128));
+    assert_eq!(map_location("", &at(119), 10), None);
+    assert_eq!(map_location("", &at(120), 1), None);
+    // The root does not count: only the result is limited.
+    let root = format!("{}/", "r".repeat(200));
     assert_eq!(
-        map_location("src/v-1.2.3/main.rs", 1),
-        None,
-        "the pattern drops the '-' anyway"
-    );
-    assert_eq!(
-        map_location("app-v2/src/main.rs", 4).as_deref(),
-        Some("src/main.rs:4")
-    );
-    assert_eq!(
-        map_location("app-1.2/src/main.rs", 4).as_deref(),
-        Some("src/main.rs:4")
+        map_location(&root, &format!("{root}{}", at(119)), 1).map(|s| s.len()),
+        Some(128)
     );
 }

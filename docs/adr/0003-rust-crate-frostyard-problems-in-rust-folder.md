@@ -53,16 +53,34 @@ section "Rust crate" of [specs/problems-package.md](../specs/problems-package.md
   `Recorder::install_panic_hook` takes the current hook and sets a hook that
   first writes the record and then calls the previous hook with the same
   `PanicHookInfo`. The usual panic message and the hooks of other libraries
-  still run, and the record is in the journal before an abort. The hook
-  never panics (a poisoned lock is used as is).
-- **"Our crates only" location rule.** `map_location` keeps a location only
-  for a relative path with a `src` component, with no
-  `<name>-<major>.<minor>.<patch>` folder before it, and only when the result
-  `src/...rs:<line>` matches the v1 location pattern (128 bytes at most). The
-  result starts at the first `src` component (`src-tauri/src/bridge.rs` gives
-  `src/bridge.rs`). Absolute paths (dependencies, the standard library) and
-  `trim-paths` paths of dependencies (`serde-1.0.219/src/...`) give no
-  location.
+  still run, and the record is in the journal before an abort. The work of
+  the crate in the hook never panics (no unwrap, no failing index, a
+  poisoned lock is used as is). That guarantee does not cover the previous
+  hook: a previous hook that panics aborts the process (a panic inside a
+  panic hook aborts), and a previous hook that blocks blocks the panicking
+  thread.
+- **A panicking `Display` does not unwind out of `error`.** `error` formats
+  the error text only when it can write a record (on Linux, after the
+  identity and code checks), inside `std::panic::catch_unwind`; a `Display`
+  impl that fails or panics gives the code as `MESSAGE`. With
+  `panic = "abort"` such a panic still aborts (the installed hook records
+  it first).
+- **"The crate that installs the hook" location rule.**
+  `install_panic_hook` is `#[track_caller]`: it reads the file of its caller
+  (`src/main.rs`, `src-tauri/src/main.rs`) and keeps the relative prefix
+  before the first `src` folder as the crate root (`""`, `src-tauri/`). A
+  caller file that is absolute, holds a `\` or a `:`, or has no `src`
+  folder gives no root, and then no panic of the process gets a location.
+  `map_location(crate_root, file, line)` keeps a location only when `file`
+  is relative and starts exactly with `<crate_root>src/`, and the result
+  `src/<rest>:<line>` matches the v1 location pattern (128 bytes at most):
+  `src-tauri/src/bridge.rs` with root `src-tauri/` gives `src/bridge.rs`.
+  Every other path gives no location: absolute paths (crates.io, git and
+  vendored dependencies, the standard library), and relative paths of other
+  crates (`vendor/serde/src/...`, `library/core/src/...` after a path
+  remapping, `serde-1.0.219/src/...` from `trim-paths`, another workspace
+  member). The rule names the app's crate exactly, so it needs no guess
+  about the names of dependency folders.
 - **A no-op on other OSes.** On every OS but Linux the crate compiles, a
   recorder writes nothing, and the hook only calls the previous hook;
   `validate`, `map_location` and `decode_entry` work everywhere. CI runs a
@@ -88,11 +106,14 @@ section "Rust crate" of [specs/problems-package.md](../specs/problems-package.md
 - A cargo git dependency fetches the whole std repository, and the crate
   version in `Cargo.toml` is not the release version: the tag is. Dependabot
   of an app sees the tag, not a crates.io version.
-- The location rule sees only the path. A path dependency inside the
-  workspace counts as our crate; a workspace folder named like a crate
-  release hides the location; path remapping can let another path through
-  when the remapped folder has no version in its name; and a panic outside a
-  `src` folder (`build.rs`, `tests/`) has no location.
+- Only the crate that installs the hook gets locations. A panic in another
+  crate of the same workspace (a library crate of the app) has no location,
+  and neither has a panic in a file of the app's crate outside its `src`
+  folder (`build.rs`, `tests/`). A path remapping (`--remap-path-prefix`,
+  `trim-paths`) that makes the app's own paths absolute or changes their
+  prefix gives no location for any panic. An app must call
+  `install_panic_hook` directly in its own crate; called through a helper in
+  another crate, it takes the root of that crate.
 - The hook covers every thread, but a library that sets its own hook later
   without calling the previous hook removes it. A panic inside a panic hook
   aborts with no record, and a fatal signal (for example a crash in C code)
@@ -111,6 +132,11 @@ section "Rust crate" of [specs/problems-package.md](../specs/problems-package.md
 - **Call the previous hook first:** the default hook prints first, and with
   `panic = "abort"` a slow output could cost the record; recording first
   costs only 1 non-blocking send.
+- **A path heuristic for "our crates" (a `src` folder and no
+  `<name>-<x.y.z>` folder before it):** the first version of this crate. A
+  cross-review found that it let `vendor/serde/src/...` and
+  `library/core/src/...` through; a rule that names the app's crate root
+  exactly fails closed instead.
 - **Send the full panic path, or the frames of a backtrace:** paths hold
   user names and dependency details; the v1 schema allows only
   `src/...rs:<line>` for Rust.

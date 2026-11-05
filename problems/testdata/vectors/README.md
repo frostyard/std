@@ -33,7 +33,8 @@ library.
 | `in.code` | `write` | The code of an error |
 | `in.message` | `write` | The error text or the panic message. No `in.message` on an error: the writer gets no error value (Go: `nil`), and `MESSAGE` is the code |
 | `in.frame` | `write`, `frame` | A raw Go function name, as the runtime gives it, innermost first; it repeats. The writer maps each one |
-| `in.location` | `write` | The raw Rust panic location, `file:line`, as `PanicHookInfo::location()` gives it (split at the last `:`). The writer maps it with `map_location`; the `journal.FROSTYARD_LOCATION` line holds the result, and there is none when the result is `None` |
+| `in.location` | `write` | The raw Rust panic location, `file:line`, as `PanicHookInfo::location()` gives it (split at the last `:`). The writer maps it with `map_location(crate_root, file, line)`; the `journal.FROSTYARD_LOCATION` line holds the result, and there is none when the result is `None` |
+| `in.crate_root` | `write` | The crate root of the Rust panic hook: the relative prefix before the first `src` folder of the file that installed the hook (`src-tauri/` for `src-tauri/src/main.rs`). Empty (`in.crate_root:`) or absent means `""`, the workspace root. Only a location under `<crate_root>src/` is kept. The Go runner ignores it |
 | `out.frame` | `frame` | The result of the frame mapping (`MapFrame` in Go) for `in.frame` |
 | `journal.<FIELD>` | `write`, `validate` | 1 journal field. In a `write` vector, the lines list every field in the order the writer writes them. Repeated `journal.FROSTYARD_FRAMES` lines join with 1 `\n` into 1 field value |
 | `payload.<field>` | `write`, `validate` | 1 S8 detail field that the reader returns when it accepts the record. `payload.frames` repeats, 1 line for each frame |

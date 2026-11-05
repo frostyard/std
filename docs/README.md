@@ -26,7 +26,7 @@ Org-wide decisions binding this repo are listed in [org-adrs.md](org-adrs.md).
   `RecoverPanic` and `CrashOutput`
 - [0003 — The Rust crate frostyard-problems lives in rust/ of std](adr/0003-rust-crate-frostyard-problems-in-rust-folder.md)
   — stdlib only, the panic hook records and then calls the previous hook,
-  the "our crates only" location rule, a no-op on other OSes, Rust pinned
+  the "crate that installs the hook" location rule, a no-op on other OSes, Rust pinned
   in `mise.toml`, a cargo CI job, and a cargo git dependency on a std tag
 
 ### Design

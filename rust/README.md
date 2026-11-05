@@ -43,8 +43,16 @@ fn main() {
 - The app ID must be in the S8 allowlist and the version must be a release
   semver (`1.2.3` or `1.2.3-rc.1`); otherwise the recorder is inert.
 - A code matches `^[a-z][a-z0-9_.]{0,63}$`; a bad code writes nothing.
-- A panic location is kept only for the app's own crates
-  (`src/...rs:<line>`); see `map_location`.
+- A panic location (`src/...rs:<line>`) is kept only for the crate that
+  calls `install_panic_hook`: the function reads the file of its caller
+  (for example `src-tauri/src/main.rs`, crate root `src-tauri/`) and keeps
+  only locations under `<crate root>src/`. Call it directly in the app's
+  crate. Other crates, dependencies and the standard library get no
+  location; see `map_location`.
+- A `Display` impl that panics inside `error` gives the code as `MESSAGE`;
+  `error` catches the panic and returns.
+- The crate's own work in the panic hook never panics. A previous hook that
+  panics or blocks is outside that guarantee.
 - In the tests of an app, bind a `UnixDatagram` in a temporary folder, pass
   its path with `Recorder::with_socket`, and read a record back with
   `decode_entry` and `validate`.

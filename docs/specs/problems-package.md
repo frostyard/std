@@ -194,8 +194,9 @@ lines join with `\n`), `payload.<field>`, `out.frame`, `expect` (`ok` or
 writes only the `write` vectors of its own runtime (`in.runtime`); every
 `write` vector with `expect: ok` and every `validate` vector goes through
 both validators, and both run every `frame` vector. For a Rust `write`
-vector, `in.location` is the raw `file:line` of the panic location, and the
-writer maps it with `map_location`.
+vector, `in.location` is the raw `file:line` of the panic location and
+`in.crate_root` the crate root of the hook (absent: `""`); the writer maps
+the location with `map_location(crate_root, file, line)`.
 
 ## Rules
 
@@ -285,10 +286,11 @@ impl Recorder {
     pub fn with_socket(self, path: impl Into<PathBuf>) -> Recorder;
     pub fn err(&self) -> Option<&str>;
     pub fn error(&self, code: &str, err: Option<&dyn std::fmt::Display>);
+    #[track_caller]
     pub fn install_panic_hook(&self);
 }
 
-pub fn map_location(file: &str, line: u32) -> Option<String>;
+pub fn map_location(crate_root: &str, file: &str, line: u32) -> Option<String>;
 pub fn validate(fields: &HashMap<String, String>) -> Result<Detail, Invalid>;
 pub fn decode_entry(b: &[u8]) -> Result<HashMap<String, String>, DecodeError>;
 
@@ -304,8 +306,8 @@ pub struct Detail {
 | `Recorder::new` | Never fails. Inert when `app_id` is off the allowlist or `version` fails the v1 semver pattern (the component is an enum, so it is always valid) |
 | `with_socket` | The journal socket path; default `DEFAULT_SOCKET`. For tests of apps |
 | `err` | Why the recorder is inert, or `None` |
-| `error` | As Go `Error`: class `error`, `PRIORITY=3`, `FROSTYARD_CODE=code`, `MESSAGE` = the `Display` text of `err` (the code when `err` is `None`, or when `Display` fails). A bad code writes nothing |
-| `install_panic_hook` | Takes the current hook (`std::panic::take_hook`) and sets a hook that FIRST records the panic, THEN calls the previous hook with the same `PanicHookInfo`. The record: class `panic`, `PRIORITY=2`, `MESSAGE` = the payload when it is a `&str` or a `String`, else `Box<dyn Any>`, and `FROSTYARD_LOCATION` only when `map_location` returns a value. The hook never panics. An inert recorder installs the hook too: it records nothing and calls the previous hook |
+| `error` | As Go `Error`: class `error`, `PRIORITY=3`, `FROSTYARD_CODE=code`, `MESSAGE` = the `Display` text of `err` (the code when `err` is `None`, or when `Display` returns an error or panics). A bad code writes nothing. `err` is formatted only when a record can be written (not inert, a valid code, Linux), inside `std::panic::catch_unwind`: a panicking `Display` never unwinds out of `error`. With `panic = "abort"` it still aborts (an installed hook records that panic first). On other OSes `error` returns at once and calls no `Display` |
+| `install_panic_hook` | Takes the current hook (`std::panic::take_hook`) and sets a hook that FIRST records the panic, THEN calls the previous hook with the same `PanicHookInfo`. The record: class `panic`, `PRIORITY=2`, `MESSAGE` = the payload when it is a `&str` or a `String`, else `Box<dyn Any>`, and `FROSTYARD_LOCATION` only when `map_location` with the crate root returns a value. `#[track_caller]`: the crate root comes from the file of the caller (see [Location rule](#location-rule)). The work of the crate in the hook never panics; a previous hook that panics (a panic inside a panic hook aborts) or blocks is outside that guarantee. An inert recorder installs the hook too: it records nothing and calls the previous hook |
 | `map_location` | See [Location rule](#location-rule) |
 | `validate` | Exactly the rules of Go `Validate` (rule 7), also for Go records: the frame pattern, the 160-byte frame limit and the 32-frame limit are in the crate too |
 | `decode_entry` | As Go `DecodeEntry`; also an error for a value that is not UTF-8 |
@@ -321,29 +323,43 @@ records in any 60 seconds) is a process-wide static. On other OSes a
 
 ### Location rule
 
-`map_location(file, line)` returns `Some("src/<rest>:<line>")` only when all
-are true, else `None`:
+The rule is "the crate that installs the hook".
 
-1. `file` is relative: it does not start with `/`, and holds no `\` and no
+**Crate root.** `install_panic_hook` is `#[track_caller]` and reads
+`std::panic::Location::caller().file()`, the file of the app code that
+installs the hook. The crate root is the relative prefix before its first
+`src` folder component: `src/main.rs` and `src/bin/x.rs` give `""`,
+`src-tauri/src/main.rs` gives `src-tauri/`. A caller file that is absolute,
+holds a `\` or a `:`, or has no `src` folder (`examples/x.rs`) gives no
+root; then no panic of the process gets a location. The root lives in the
+hook, not in the `Recorder`.
+
+**`map_location(crate_root, file, line)`** returns `Some("src/<rest>:<line>")`
+only when all are true, else `None`:
+
+1. `crate_root` is `""` or ends with `/`.
+2. `file` is relative: it does not start with `/`, and holds no `\` and no
    `:`.
-2. A path component is exactly `src`; the result starts at the first one
-   (`src-tauri/src/sync/imap.rs` gives `src/sync/imap.rs`).
-3. No component before that `src` looks like a cargo
-   `<name>-<major>.<minor>.<patch>` folder (a `-`, then 3 dot-separated
-   numbers, then the end, `-` or `+`), for example `serde-1.0.219`.
+3. `file` starts exactly with `crate_root` + `src/`; `<rest>` is what
+   follows (`src-tauri/src/sync/imap.rs` with root `src-tauri/` gives
+   `src/sync/imap.rs`).
 4. The result matches
    `^src/([a-z0-9_]+/){0,8}[a-z0-9_]+\.rs:[1-9][0-9]{0,5}$` and is at most
    128 bytes.
 
-Cargo gives workspace members a path relative to the workspace root;
-crates.io, git and vendored dependencies get an absolute path, and the
-standard library `/rustc/<hash>/library/...`. The limits are in
-[ADR-0003](../adr/0003-rust-crate-frostyard-problems-in-rust-folder.md).
+Cargo gives workspace members a path relative to the workspace root, so the
+files of the app's crate share the prefix of the file that installs the
+hook. crates.io, git and vendored dependencies get an absolute path, and the
+standard library `/rustc/<hash>/library/...`; relative paths of other
+crates (`vendor/serde/src/...`, `library/core/src/...` after a remapping,
+another workspace member) do not start with `<crate_root>src/`. The limits
+are in [ADR-0003](../adr/0003-rust-crate-frostyard-problems-in-rust-folder.md).
 
 ### Vectors the crate runs
 
 - `write` with `in.runtime: rust`: the writer gets the `in.*` values through
-  a test socket (the panic path with the raw `in.location`), and the
+  a test socket (the panic path with the raw `in.location` and
+  `in.crate_root`), and the
   datagram must hold the `journal.*` fields in order and no other; with
   `expect: reject`, no datagram.
 - Every `write` with `expect: ok` (both runtimes) and every `validate`:

@@ -39,7 +39,7 @@ Beside the Go module, the folder `rust/` holds the Rust crate `frostyard-problem
 │       ├── patterns.rs    # Hand-written v1 matchers (semver, code, frame, location), allowlist, enums
 │       ├── validate.rs    # Detail, Invalid, validate (the rules of Go Validate)
 │       ├── journal.rs     # Native-protocol encoding, decode_entry, the MESSAGE cut
-│       ├── location.rs    # map_location: the "our crates only" rule
+│       ├── location.rs    # crate root and map_location: the "crate that installs the hook" rule
 │       ├── recorder.rs    # Recorder, error, install_panic_hook (record, then the previous hook)
 │       ├── rate.rs        # The process-wide rate cap (10 in any 60 s)
 │       ├── transport.rs   # 1 non-blocking UnixDatagram send (Linux); no-op elsewhere
@@ -165,9 +165,11 @@ errors.
 - **Rust crate.** `frostyard-problems` in `rust/` writes the same records
   with `FROSTYARD_RUNTIME=rust` and a `FROSTYARD_LOCATION` instead of
   frames. `Recorder::install_panic_hook` records each panic first and then
-  calls the previous hook; `map_location` keeps a location only for the
-  app's own crates (a relative `src/...rs` path, no `<name>-<x.y.z>` folder
-  before `src`). Its matchers are hand-written ports of the Go regular
+  calls the previous hook. It is `#[track_caller]`: the file of its caller
+  gives the crate root (`""` or `src-tauri/`), and `map_location` keeps a
+  location only for a relative file under `<crate_root>src/`, so other
+  crates, dependencies and the standard library never get one. `error`
+  formats its error inside `catch_unwind`, only when it can write. Its matchers are hand-written ports of the Go regular
   expressions, and it validates Go records too (frames included), so both
   validators accept and reject the same vectors
   ([ADR-0003](../adr/0003-rust-crate-frostyard-problems-in-rust-folder.md)).

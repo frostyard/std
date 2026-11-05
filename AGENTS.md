@@ -199,10 +199,15 @@ cargo command runs `--locked`.
   `problems/problems.go`; change both together.
 - **API** — `Recorder::new(app_id, version, component)` (inert on a bad
   identity, `err()` says why), `with_socket`, `error(code, Option<&dyn
-  Display>)`, `install_panic_hook()` (records the panic FIRST, THEN calls
-  the previous hook; the hook never panics), `map_location` (the "our
-  crates only" rule), `validate` (the rules of Go `Validate`, frames
-  included), `decode_entry`.
+  Display>)` (formats `err` only when it can write, on Linux, inside
+  `catch_unwind`: a panicking `Display` gives the code as `MESSAGE`),
+  `install_panic_hook()` (`#[track_caller]`; records the panic FIRST, THEN
+  calls the previous hook; the crate's own work in the hook never panics,
+  but a previous hook that panics or blocks is outside that guarantee),
+  `map_location(crate_root, file, line)` (the "crate that installs the
+  hook" rule: only files under `<crate_root>src/`, where the root comes
+  from the caller file of `install_panic_hook`), `validate` (the rules of Go
+  `Validate`, frames included), `decode_entry`.
 - **Transport** — 1 `send_to` on a new non-blocking
   `UnixDatagram::unbound()` on Linux; every error drops the record; the
   rate cap is a process-wide static. Other OSes compile and write nothing.

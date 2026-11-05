@@ -174,7 +174,10 @@ fn run_write(v: &Vector) -> Result<(), String> {
                     Some((file, line))
                 }
             };
-            let _ = rec.record_panic(v.text("in.message"), location, &send_datagram);
+            // in.crate_root is the root that install_panic_hook derives from
+            // the file of its caller; absent means "".
+            let root = Some(v.text("in.crate_root"));
+            let _ = rec.record_panic(v.text("in.message"), root, location, &send_datagram);
         }
         class => return Err(format!("bad in.class {class:?}")),
     }
