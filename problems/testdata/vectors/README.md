@@ -33,7 +33,7 @@ library.
 | `in.code` | `write` | The code of an error |
 | `in.message` | `write` | The error text or the panic message. No `in.message` on an error: the writer gets no error value (Go: `nil`), and `MESSAGE` is the code |
 | `in.frame` | `write`, `frame` | A raw Go function name, as the runtime gives it, innermost first; it repeats. The writer maps each one |
-| `in.location` | `write` | The Rust panic location |
+| `in.location` | `write` | The raw Rust panic location, `file:line`, as `PanicHookInfo::location()` gives it (split at the last `:`). The writer maps it with `map_location`; the `journal.FROSTYARD_LOCATION` line holds the result, and there is none when the result is `None` |
 | `out.frame` | `frame` | The result of the frame mapping (`MapFrame` in Go) for `in.frame` |
 | `journal.<FIELD>` | `write`, `validate` | 1 journal field. In a `write` vector, the lines list every field in the order the writer writes them. Repeated `journal.FROSTYARD_FRAMES` lines join with 1 `\n` into 1 field value |
 | `payload.<field>` | `write`, `validate` | 1 S8 detail field that the reader returns when it accepts the record. `payload.frames` repeats, 1 line for each frame |
@@ -51,3 +51,15 @@ library.
 - `validate` with `expect: reject`: the reader rejects the `journal.*`
   fields.
 - `frame`: the mapping of `in.frame` gives `out.frame`.
+
+## Which vectors each runtime runs
+
+| Vector | Go tests (`problems/problems_test.go`) | Rust tests (`rust/src/tests/vectors.rs`) |
+| --- | --- | --- |
+| `write`, `in.runtime: go` | Write (Linux) and, with `expect: ok`, `Validate` | `validate` (with `expect: ok`) |
+| `write`, `in.runtime: rust` | `Validate` (with `expect: ok`) | Write through a test socket (Linux) and, with `expect: ok`, `validate` |
+| `validate` | `Validate` | `validate` |
+| `frame` | `MapFrame` | the crate-private frame mapping, the same check that `validate` uses |
+
+Both runners fail on an unknown `type`, on a type with 0 vectors, and when
+fewer than 40 vectors load.

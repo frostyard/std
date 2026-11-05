@@ -1,8 +1,11 @@
-.PHONY: all clean fmt lint lint-version-check vet verify tidy-diff gofmt-check test test-cover coverage-check test-coverage-check tidy check ci svu-version-check bump help
+.PHONY: all clean fmt lint lint-version-check vet verify tidy-diff gofmt-check test test-cover coverage-check test-coverage-check tidy check ci rust-check svu-version-check bump help
 
 # Go commands
 GO := go
 GOFMT := gofmt
+# The Rust crate in rust/ (ADR-0003); rust 1.99.1 and its targets come from
+# mise.toml through `mise install`.
+CARGO := cargo
 # Pinned golangci-lint release, read from mise.toml — the single source of
 # every tool pin (core ADR-0043): `mise install` provisions it locally, in CI
 # (jdx/mise-action), and on Snowcat workers, verified against mise.lock.
@@ -125,10 +128,12 @@ check: fmt lint vet test test-coverage-check coverage-check
 # architecture `_examples/` build below is not exclusive to this target: the
 # workflow's Examples Cross-Arch Build job (`examples-build`) builds the same
 # programs, enumerated by the same scripts/example-dirs.sh, for the same
-# linux/amd64 and linux/arm64 pair, so the two cannot drift. Keep this comment,
-# the `## ci` help line, AGENTS.md's Commands block, and docs/org-adrs.md's
-# ADR-0038 entry saying the same thing.
-## ci: Canonical local gate, sequential and fail-fast — tidy diff, vet, gofmt, lint at the pin, unit+e2e tests, race, cross-arch build of _examples/. Not a mirror of the GitHub workflow (Security Scan, Docs integrity, Release config, and the coverage floor are not run here; the cross-arch example build is also run on GitHub by the Examples Cross-Arch Build job) (core ADR-0038)
+# linux/amd64 and linux/arm64 pair, so the two cannot drift. The last step,
+# `make rust-check`, checks the Rust crate in rust/ (ADR-0003) with the same
+# commands as the workflow's Rust crate job (`rust`), so it needs cargo from
+# `mise install`. Keep this comment, the `## ci` help line, AGENTS.md's
+# Commands block, and docs/org-adrs.md's ADR-0038 entry saying the same thing.
+## ci: Canonical local gate, sequential and fail-fast — tidy diff, vet, gofmt, lint at the pin, unit+e2e tests, race, cross-arch build of _examples/, the Rust crate (make rust-check). Not a mirror of the GitHub workflow (Security Scan, Docs integrity, Release config, and the coverage floor are not run here; the cross-arch example build is also run on GitHub by the Examples Cross-Arch Build job, and the Rust crate check by the Rust crate job) (core ADR-0038)
 ci:
 	@echo "==> ci: go.mod is tidy"
 	@$(MAKE) --no-print-directory tidy-diff
@@ -152,7 +157,29 @@ ci:
 			GOOS=$$goos GOARCH=$$goarch $(GO) build -o /dev/null "$$dir" || exit 1; \
 		done; \
 	done
+	@echo "==> ci: rust crate"
+	@$(MAKE) --no-print-directory rust-check
 	@echo "==> ci passed"
+
+## rust-check: Check the Rust crate in rust/ (ADR-0003) — cargo fmt, clippy, tests, check builds for Windows and macOS, and no dependency (requires cargo from mise install; the CI Rust crate job runs it)
+rust-check:
+	@command -v $(CARGO) >/dev/null 2>&1 || { \
+		echo "cargo not installed; provision every pinned tool with:"; \
+		echo "mise install"; \
+		exit 1; \
+	}
+	cd rust && $(CARGO) fmt --check
+	cd rust && $(CARGO) clippy --all-targets --locked -- -D warnings
+	cd rust && $(CARGO) test --locked
+	cd rust && $(CARGO) check --locked --target x86_64-pc-windows-gnu
+	cd rust && $(CARGO) check --locked --target x86_64-apple-darwin
+	@tree="$$(cd rust && $(CARGO) tree --locked --edges normal,build,dev --prefix none)" || exit 1; \
+	if [ "$$(printf '%s\n' "$$tree" | wc -l)" -ne 1 ] || [ "$${tree%% *}" != frostyard-problems ]; then \
+		echo "rust/ must use only the Rust standard library; cargo tree prints:"; \
+		echo "$$tree"; \
+		exit 1; \
+	fi; \
+	echo "cargo tree: $$tree (no dependency)"
 
 ## svu-version-check: Fail unless the svu on PATH is the mise.toml pin
 svu-version-check:

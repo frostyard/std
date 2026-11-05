@@ -156,6 +156,179 @@ payload.class: panic
 payload.location: src/sync/imap.rs:214
 expect: ok
 
+# A valid Rust error. Only the Rust writer writes it; both readers validate it.
+vector: rust-error
+type: write
+in.app_id: org.frostyard.Frostmail
+in.version: 2.0.1
+in.component: gui
+in.runtime: rust
+in.class: error
+in.code: sync.imap
+in.message: connection reset by peer
+journal.MESSAGE_ID: 8915bdd215c84cbab0c31c05a1a33e7e
+journal.PRIORITY: 3
+journal.MESSAGE: connection reset by peer
+journal.FROSTYARD_SCHEMA: frostyard.problem/1
+journal.FROSTYARD_APP_ID: org.frostyard.Frostmail
+journal.FROSTYARD_APP_VERSION: 2.0.1
+journal.FROSTYARD_RUNTIME: rust
+journal.FROSTYARD_COMPONENT: gui
+journal.FROSTYARD_CLASS: error
+journal.FROSTYARD_CODE: sync.imap
+payload.app_id: org.frostyard.Frostmail
+payload.app_version: 2.0.1
+payload.runtime: rust
+payload.component: gui
+payload.class: error
+payload.code: sync.imap
+expect: ok
+
+# A Rust error with no error value (None): MESSAGE is the code.
+vector: rust-error-no-message
+type: write
+in.app_id: org.frostyard.Frostnotes
+in.version: 0.3.0-beta.1
+in.component: daemon
+in.runtime: rust
+in.class: error
+in.code: store.open
+journal.MESSAGE_ID: 8915bdd215c84cbab0c31c05a1a33e7e
+journal.PRIORITY: 3
+journal.MESSAGE: store.open
+journal.FROSTYARD_SCHEMA: frostyard.problem/1
+journal.FROSTYARD_APP_ID: org.frostyard.Frostnotes
+journal.FROSTYARD_APP_VERSION: 0.3.0-beta.1
+journal.FROSTYARD_RUNTIME: rust
+journal.FROSTYARD_COMPONENT: daemon
+journal.FROSTYARD_CLASS: error
+journal.FROSTYARD_CODE: store.open
+payload.app_id: org.frostyard.Frostnotes
+payload.app_version: 0.3.0-beta.1
+payload.runtime: rust
+payload.component: daemon
+payload.class: error
+payload.code: store.open
+expect: ok
+
+# in.location is the raw location; a workspace member in src-tauri/ maps to the part from the first src component.
+vector: rust-panic-src-tauri
+type: write
+in.app_id: org.frostyard.Frostread
+in.version: 1.0.0
+in.component: gui
+in.runtime: rust
+in.class: panic
+in.message: index out of bounds: the len is 3 but the index is 7
+in.location: src-tauri/src/bridge.rs:88
+journal.MESSAGE_ID: 8915bdd215c84cbab0c31c05a1a33e7e
+journal.PRIORITY: 2
+journal.MESSAGE: index out of bounds: the len is 3 but the index is 7
+journal.FROSTYARD_SCHEMA: frostyard.problem/1
+journal.FROSTYARD_APP_ID: org.frostyard.Frostread
+journal.FROSTYARD_APP_VERSION: 1.0.0
+journal.FROSTYARD_RUNTIME: rust
+journal.FROSTYARD_COMPONENT: gui
+journal.FROSTYARD_CLASS: panic
+journal.FROSTYARD_LOCATION: src/bridge.rs:88
+payload.app_id: org.frostyard.Frostread
+payload.app_version: 1.0.0
+payload.runtime: rust
+payload.component: gui
+payload.class: panic
+payload.location: src/bridge.rs:88
+expect: ok
+
+# A panic in a crates.io dependency has an absolute path: no FROSTYARD_LOCATION.
+vector: rust-panic-registry-dependency
+type: write
+in.app_id: org.frostyard.Frostmail
+in.version: 2.0.1
+in.component: gui
+in.runtime: rust
+in.class: panic
+in.message: invalid type: map, expected a string
+in.location: /home/u/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.219/src/de/mod.rs:120
+journal.MESSAGE_ID: 8915bdd215c84cbab0c31c05a1a33e7e
+journal.PRIORITY: 2
+journal.MESSAGE: invalid type: map, expected a string
+journal.FROSTYARD_SCHEMA: frostyard.problem/1
+journal.FROSTYARD_APP_ID: org.frostyard.Frostmail
+journal.FROSTYARD_APP_VERSION: 2.0.1
+journal.FROSTYARD_RUNTIME: rust
+journal.FROSTYARD_COMPONENT: gui
+journal.FROSTYARD_CLASS: panic
+payload.app_id: org.frostyard.Frostmail
+payload.app_version: 2.0.1
+payload.runtime: rust
+payload.component: gui
+payload.class: panic
+expect: ok
+
+# A panic in the standard library: no FROSTYARD_LOCATION.
+vector: rust-panic-std
+type: write
+in.app_id: org.frostyard.Frostmail
+in.version: 2.0.1
+in.component: gui
+in.runtime: rust
+in.class: panic
+in.message: called `Option::unwrap()` on a `None` value
+in.location: /rustc/17067e9ac6d7e98f18d4d3a5b4ea0dcd2e1e8a3a/library/core/src/option.rs:2000
+journal.MESSAGE_ID: 8915bdd215c84cbab0c31c05a1a33e7e
+journal.PRIORITY: 2
+journal.MESSAGE: called `Option::unwrap()` on a `None` value
+journal.FROSTYARD_SCHEMA: frostyard.problem/1
+journal.FROSTYARD_APP_ID: org.frostyard.Frostmail
+journal.FROSTYARD_APP_VERSION: 2.0.1
+journal.FROSTYARD_RUNTIME: rust
+journal.FROSTYARD_COMPONENT: gui
+journal.FROSTYARD_CLASS: panic
+payload.app_id: org.frostyard.Frostmail
+payload.app_version: 2.0.1
+payload.runtime: rust
+payload.component: gui
+payload.class: panic
+expect: ok
+
+# A dependency path that trim-paths made relative (a name-<version> folder before src): no FROSTYARD_LOCATION.
+vector: rust-panic-trim-paths-dependency
+type: write
+in.app_id: org.frostyard.Frostmail
+in.version: 2.0.1
+in.component: gui
+in.runtime: rust
+in.class: panic
+in.message: boom
+in.location: serde-1.0.219/src/de.rs:10
+journal.MESSAGE_ID: 8915bdd215c84cbab0c31c05a1a33e7e
+journal.PRIORITY: 2
+journal.MESSAGE: boom
+journal.FROSTYARD_SCHEMA: frostyard.problem/1
+journal.FROSTYARD_APP_ID: org.frostyard.Frostmail
+journal.FROSTYARD_APP_VERSION: 2.0.1
+journal.FROSTYARD_RUNTIME: rust
+journal.FROSTYARD_COMPONENT: gui
+journal.FROSTYARD_CLASS: panic
+payload.app_id: org.frostyard.Frostmail
+payload.app_version: 2.0.1
+payload.runtime: rust
+payload.component: gui
+payload.class: panic
+expect: ok
+
+# A Rust code that fails its pattern: the writer writes nothing.
+vector: rust-write-bad-code
+type: write
+in.app_id: org.frostyard.Frostmail
+in.version: 2.0.1
+in.component: gui
+in.runtime: rust
+in.class: error
+in.code: Sync.IMAP
+in.message: boom
+expect: reject
+
 # A code that fails its pattern: the writer writes nothing.
 vector: write-bad-code
 type: write

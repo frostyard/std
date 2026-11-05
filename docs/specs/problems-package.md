@@ -6,8 +6,9 @@ journal, and reads them back. It implements the writer and reader side of
 [core `docs/specs/problem-report.md`](https://github.com/frostyard/core/blob/main/docs/specs/problem-report.md)
 (schema `frostyard.problem/1`, kind S8 `app_problem`, the journal record
 registry). Consumers: frostyard Go apps (writers), chairlift (reader), and
-the Rust crate `frostyard-problems` (task t4), which runs the same vectors.
-The package never sends anything over a network.
+frostyard Rust apps through the Rust crate `frostyard-problems` in `rust/`
+(see [Rust crate](#rust-crate)), which follows the same writer rules and
+`Validate`, and runs the same vectors. Neither sends anything over a network.
 
 ## Interface
 
@@ -71,10 +72,10 @@ In this order, and no others:
 | 4 | `FROSTYARD_SCHEMA` | `frostyard.problem/1` |
 | 5 | `FROSTYARD_APP_ID` | The app ID |
 | 6 | `FROSTYARD_APP_VERSION` | The version |
-| 7 | `FROSTYARD_RUNTIME` | `go` |
+| 7 | `FROSTYARD_RUNTIME` | `go` (the Rust crate writes `rust`) |
 | 8 | `FROSTYARD_COMPONENT` | The component |
 | 9 | `FROSTYARD_CLASS` | `panic` or `error` |
-| 10 | `FROSTYARD_CODE` or `FROSTYARD_FRAMES` | The code (error), or the frames joined by 1 `\n` (panic) |
+| 10 | `FROSTYARD_CODE` or `FROSTYARD_FRAMES` | The code (error), or the frames joined by 1 `\n` (panic). The Rust crate writes `FROSTYARD_LOCATION` for a panic instead of frames, and no row 10 for a panic with no location |
 
 Each field uses the binary form of the journal native protocol: `NAME\n`,
 the value length as a little-endian uint64, the value, `\n`.
@@ -189,7 +190,12 @@ by 1 blank line, `#` comment lines, `key: value` lines split at the first
 `: `, repeatable keys. Keys: `vector`, `type` (`write`, `validate`,
 `frame`), `in.*`, `journal.<FIELD>` (repeated `journal.FROSTYARD_FRAMES`
 lines join with `\n`), `payload.<field>`, `out.frame`, `expect` (`ok` or
-`reject`). The Go tests read and run every vector; the Rust crate must too.
+`reject`). The Go tests and the Rust tests read every vector. Each writer
+writes only the `write` vectors of its own runtime (`in.runtime`); every
+`write` vector with `expect: ok` and every `validate` vector goes through
+both validators, and both run every `frame` vector. For a Rust `write`
+vector, `in.location` is the raw `file:line` of the panic location, and the
+writer maps it with `map_location`.
 
 ## Rules
 
@@ -249,17 +255,118 @@ lines join with `\n`), `payload.<field>`, `out.frame`, `expect` (`ok` or
   function under the recorder panics again) gives a second record at the
   next start: a duplicate record is better than a lost record.
 
+## Rust crate
+
+The crate `frostyard-problems` (lib `frostyard_problems`, folder `rust/`,
+decision [ADR-0003](../adr/0003-rust-crate-frostyard-problems-in-rust-folder.md))
+is the Rust writer and validator. It follows the [Writer](#writer) rules,
+the [journal fields](#journal-fields-of-a-record) and rules 1 to 7 and 10
+of this spec; it has no reader (`Read`, `ParseJSON`) and no crash files. It
+uses only the Rust standard library, also in tests (edition 2024, MSRV
+1.85, `publish = false`). Apps use a cargo git dependency on a std tag:
+
+```toml
+frostyard-problems = { git = "https://github.com/frostyard/std", tag = "vX.Y.Z" }
+```
+
+### API
+
+```rust
+pub const MESSAGE_ID: &str;      // "8915bdd215c84cbab0c31c05a1a33e7e"
+pub const SCHEMA: &str;          // "frostyard.problem/1"
+pub const DEFAULT_SOCKET: &str;  // "/run/systemd/journal/socket"
+
+pub enum Component { Daemon, Cli, Gui, Shell, Other }
+impl Component { pub const fn as_str(self) -> &'static str; }
+
+#[derive(Clone)] pub struct Recorder; // Send + Sync
+impl Recorder {
+    pub fn new(app_id: &str, version: &str, component: Component) -> Recorder;
+    pub fn with_socket(self, path: impl Into<PathBuf>) -> Recorder;
+    pub fn err(&self) -> Option<&str>;
+    pub fn error(&self, code: &str, err: Option<&dyn std::fmt::Display>);
+    pub fn install_panic_hook(&self);
+}
+
+pub fn map_location(file: &str, line: u32) -> Option<String>;
+pub fn validate(fields: &HashMap<String, String>) -> Result<Detail, Invalid>;
+pub fn decode_entry(b: &[u8]) -> Result<HashMap<String, String>, DecodeError>;
+
+pub struct Detail {
+    pub app_id: String, pub app_version: String, pub runtime: String,
+    pub component: String, pub class: String, pub code: Option<String>,
+    pub frames: Vec<String>, pub location: Option<String>,
+}
+```
+
+| Item | Behavior |
+| --- | --- |
+| `Recorder::new` | Never fails. Inert when `app_id` is off the allowlist or `version` fails the v1 semver pattern (the component is an enum, so it is always valid) |
+| `with_socket` | The journal socket path; default `DEFAULT_SOCKET`. For tests of apps |
+| `err` | Why the recorder is inert, or `None` |
+| `error` | As Go `Error`: class `error`, `PRIORITY=3`, `FROSTYARD_CODE=code`, `MESSAGE` = the `Display` text of `err` (the code when `err` is `None`, or when `Display` fails). A bad code writes nothing |
+| `install_panic_hook` | Takes the current hook (`std::panic::take_hook`) and sets a hook that FIRST records the panic, THEN calls the previous hook with the same `PanicHookInfo`. The record: class `panic`, `PRIORITY=2`, `MESSAGE` = the payload when it is a `&str` or a `String`, else `Box<dyn Any>`, and `FROSTYARD_LOCATION` only when `map_location` returns a value. The hook never panics. An inert recorder installs the hook too: it records nothing and calls the previous hook |
+| `map_location` | See [Location rule](#location-rule) |
+| `validate` | Exactly the rules of Go `Validate` (rule 7), also for Go records: the frame pattern, the 160-byte frame limit and the 32-frame limit are in the crate too |
+| `decode_entry` | As Go `DecodeEntry`; also an error for a value that is not UTF-8 |
+
+The field order of a Rust record is the order of the
+[journal fields](#journal-fields-of-a-record), with `FROSTYARD_RUNTIME=rust`
+and row 10 `FROSTYARD_CODE` (error) or `FROSTYARD_LOCATION` (panic with a
+location); a panic with no location has 9 fields. The transport (Linux
+only) is 1 `send_to` on a new `UnixDatagram::unbound()` with
+`set_nonblocking(true)`; every error drops the record. The rate cap (10
+records in any 60 seconds) is a process-wide static. On other OSes a
+`Recorder` writes nothing and the hook only calls the previous hook.
+
+### Location rule
+
+`map_location(file, line)` returns `Some("src/<rest>:<line>")` only when all
+are true, else `None`:
+
+1. `file` is relative: it does not start with `/`, and holds no `\` and no
+   `:`.
+2. A path component is exactly `src`; the result starts at the first one
+   (`src-tauri/src/sync/imap.rs` gives `src/sync/imap.rs`).
+3. No component before that `src` looks like a cargo
+   `<name>-<major>.<minor>.<patch>` folder (a `-`, then 3 dot-separated
+   numbers, then the end, `-` or `+`), for example `serde-1.0.219`.
+4. The result matches
+   `^src/([a-z0-9_]+/){0,8}[a-z0-9_]+\.rs:[1-9][0-9]{0,5}$` and is at most
+   128 bytes.
+
+Cargo gives workspace members a path relative to the workspace root;
+crates.io, git and vendored dependencies get an absolute path, and the
+standard library `/rustc/<hash>/library/...`. The limits are in
+[ADR-0003](../adr/0003-rust-crate-frostyard-problems-in-rust-folder.md).
+
+### Vectors the crate runs
+
+- `write` with `in.runtime: rust`: the writer gets the `in.*` values through
+  a test socket (the panic path with the raw `in.location`), and the
+  datagram must hold the `journal.*` fields in order and no other; with
+  `expect: reject`, no datagram.
+- Every `write` with `expect: ok` (both runtimes) and every `validate`:
+  `validate` returns exactly the `payload.*` fields, or rejects.
+- Every `frame`: the crate-private frame mapping gives `out.frame`.
+
+`make rust-check` runs `cargo fmt --check`, `cargo clippy --all-targets
+--locked -- -D warnings`, `cargo test --locked`, `cargo check --locked` for
+`x86_64-pc-windows-gnu` and `x86_64-apple-darwin`, and fails unless `cargo
+tree --locked --edges normal,build,dev --prefix none` prints only the crate.
+
 ## Derived artifacts
 
 | Artifact | Derivation |
 | --- | --- |
 | `problems/problems.go` patterns, allowlist and enums | Copied from core `docs/specs/schemas/problem-report/v1.json` |
 | `problems/testdata/vectors/v1.txt` | The journal fields and S8 payload fields of the core registry |
-| Rust crate `frostyard-problems` (`rust/`, task t4) | This spec and the same vectors |
+| Rust crate `frostyard-problems` (`rust/`) | This spec ([Rust crate](#rust-crate)); its matchers in `rust/src/patterns.rs` are hand-written ports of the patterns of `problems/problems.go` and run the same vectors |
 
 ## References
 
 - Rationale: [ADR-0002](../adr/0002-problems-package-writes-to-the-journal-only.md),
+  [ADR-0003](../adr/0003-rust-crate-frostyard-problems-in-rust-folder.md) (Rust crate),
   [core ADR-0069](https://github.com/frostyard/core/blob/main/docs/adr/0069-report-problems-local-first-opt-in-with-one-sender-per-host.md)
 - Contract: [core spec problem-report.md](https://github.com/frostyard/core/blob/main/docs/specs/problem-report.md)
 - Context: [design/overview.md](../design/overview.md)
