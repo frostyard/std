@@ -68,9 +68,12 @@ std gets a package `github.com/frostyard/std/problems`, with the spec
   (it starts as `*.crash-new`), so a concurrent start cannot remove the file
   of a live process. A marker line in the crash file stops a second record
   for a panic that `RecoverPanic` already recorded: a leftover gives no
-  record only when it holds the marker and the last line of its first panic
+  record only when it holds the marker, the last line of its first panic
   message (Go prints a multi-line panic value as tab-indented continuation
-  lines) ends with ` [recovered, repanicked]`.
+  lines) ends with ` [recovered, repanicked]`, and no continuation line
+  starts with `panic: ` (Go prints nested panics that way). A nested panic
+  chain always gives a record: a duplicate record is better than a lost
+  record.
 
 ## Consequences
 
@@ -87,9 +90,10 @@ std gets a package `github.com/frostyard/std/problems`, with the spec
   start removes it (at most 8 files for each start).
 - When other code recovers the re-panic of `RecoverPanic` (for example
   `net/http` for a handler) and the process crashes later, the later crash
-  still gives 1 record when it is a fatal error or a plain panic. The
-  remaining limit: a later crash that is also a re-panic (its first `panic: `
-  line ends with ` [recovered, repanicked]`) and whose own record was dropped
+  still gives 1 record when it is a fatal error, a plain panic, or a nested
+  panic chain. The remaining limit: a later crash that is a single re-panic
+  (its panic message ends with ` [recovered, repanicked]` and holds no
+  nested `panic: ` line) and whose own record was dropped
   (busy journal, rate cap, no journal) gives no record, because the marker of
   the earlier panic is in the file. `RecoverPanic` is for the top of a
   goroutine, not for code under such a recover.

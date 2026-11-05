@@ -23,6 +23,8 @@ func TestMain(m *testing.M) {
 		helperRecover(true)
 	case "recover-crash-multiline":
 		helperRecoverMultiline()
+	case "nested-after-recorded":
+		helperNestedAfterRecorded()
 	case "crash":
 		helperCrash()
 	case "leftover":
@@ -57,6 +59,31 @@ func helperRecoverMultiline() {
 	}
 	defer r.RecoverPanic()
 	panic("first\nsecond")
+}
+
+// helperNestedAfterRecorded records panic 1, which a recover above the
+// recorder stops. Then a later panic dies with a nested re-panic that no
+// recorder sees.
+func helperNestedAfterRecorded() {
+	r := helperRecorder()
+	if err := r.CrashOutput(); err != nil {
+		os.Exit(4)
+	}
+	func() {
+		defer func() { _ = recover() }()
+		defer r.RecoverPanic()
+		panic("first failure")
+	}()
+	laterFailure()
+}
+
+//go:noinline
+func laterFailure() {
+	defer func() {
+		defer func() { v := recover(); panic(v) }()
+		panic("cleanup failure")
+	}()
+	panic("later failure")
 }
 
 //go:noinline

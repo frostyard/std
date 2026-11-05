@@ -50,8 +50,11 @@ type crashReport struct {
 //
 // The Go runtime prints a multi-line panic value as the "panic: " line and 1
 // tab-indented continuation line for each further line; the suffix goes on
-// the last line. The message is all these lines, joined by "\n", with the
-// tabs removed.
+// the last line. It also prints each nested panic as a tab-indented
+// "panic: " line (printpanics). The message is all these lines, joined by
+// "\n", with the tabs removed. A block with a nested "panic: " line is never
+// skipped: RecoverPanic re-panics only 1 value, and an old marker can be in
+// the file of a later crash. A duplicate record is better than a lost one.
 // Only the first goroutine block gives frames; file paths, line numbers,
 // offsets and arguments never reach a frame.
 func parseCrash(data []byte) (crashReport, bool) {
@@ -78,11 +81,13 @@ func parseCrash(data []byte) (crashReport, bool) {
 		}
 		if strings.HasPrefix(l, "panic: ") {
 			msg := []string{l}
+			nested := false
 			for i+1 < len(lines) && strings.HasPrefix(lines[i+1], "\t") {
 				i++
 				msg = append(msg, lines[i][1:])
+				nested = nested || strings.HasPrefix(lines[i][1:], "panic: ")
 			}
-			if strings.HasSuffix(msg[len(msg)-1], repanicSuffix) && slices.Contains(lines, recordedMarker) {
+			if !nested && strings.HasSuffix(msg[len(msg)-1], repanicSuffix) && slices.Contains(lines, recordedMarker) {
 				return c, false
 			}
 			c.message = truncate(strings.Join(msg, "\n"), maxMessageLen)

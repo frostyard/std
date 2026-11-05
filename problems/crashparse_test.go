@@ -129,6 +129,11 @@ func TestParseCrashMarker(t *testing.T) {
 		{"multi-line re-panic", crashFixtureHeader + marker + "panic: first\n\tsecond [recovered, repanicked]\n\ngoroutine 1 [running]:\nmain.main()\n", false, ""},
 		{"multi-line plain panic", crashFixtureHeader + marker + "panic: g1\n\tg2\n\ngoroutine 7 [running]:\nmain.main.func1()\n", true, "panic: g1\ng2"},
 		{"multi-line re-panic without marker", crashFixtureHeader + "panic: first\n\tsecond [recovered, repanicked]\n\ngoroutine 1 [running]:\nmain.main()\n", true, "panic: first\nsecond [recovered, repanicked]"},
+		// A nested panic chain (Go printpanics): a later crash that
+		// RecoverPanic did not record, after an old marker. It gives a
+		// record: a duplicate is better than a lost record.
+		{"nested panic chain", crashFixtureHeader + marker + "panic: later failure\n\tpanic: cleanup failure [recovered, repanicked]\n\ngoroutine 1 [running]:\nmain.main.func1.1()\n", true, "panic: later failure\npanic: cleanup failure [recovered, repanicked]"},
+		{"nested panic chain, multi-line value", crashFixtureHeader + marker + "panic: a\n\tb\n\tpanic: c\n\td [recovered, repanicked]\n\ngoroutine 1 [running]:\nmain.main()\n", true, "panic: a\nb\npanic: c\nd [recovered, repanicked]"},
 		// A re-panic with no marker: RecoverPanic did not record it.
 		{"re-panic without marker", strings.Replace(crashFixtureRepanic, marker, "", 1), true, "panic: boom [recovered, repanicked]"},
 	}

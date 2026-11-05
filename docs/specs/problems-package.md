@@ -158,15 +158,21 @@ an error with the exit status and at most 1024 bytes of stderr.
 - A leftover gives no record when: the header is not valid (4 fields, these
   keys, and an identity that `New` accepts), there is no `panic: ` or
   `fatal error: ` line, the first `goroutine N [...]:` block after it gives
-  no frame, or the file holds the marker line AND the first crash message is
-  a panic message whose last line ends with ` [recovered, repanicked]` (the
-  re-panic of a panic that `RecoverPanic` recorded). A `fatal error: `
-  crash, or a panic message without that suffix, gives 1 record even when
-  the marker is in the file.
+  no frame, or ALL 3 of these are true: the file holds the marker line, the
+  first crash message is a panic message whose last line ends with
+  ` [recovered, repanicked]`, and no continuation line of that message
+  starts with `panic: ` (the re-panic of 1 panic that `RecoverPanic`
+  recorded). A `fatal error: ` crash, a panic message without that suffix,
+  or a nested panic chain gives 1 record even when the marker is in the
+  file. A duplicate record is better than a lost record.
 - Panic message: the first `panic: ` line plus the tab-indented
   continuation lines that follow it directly. Go 1.26 prints a multi-line
   panic value that way (`panic: first`, then a tab and
-  `second [recovered, repanicked]`), so the suffix is on the last line.
+  `second [recovered, repanicked]`), so the suffix is on the last line. Go
+  1.26 also prints each nested panic as a continuation line that starts
+  with `panic: ` after its tab (`printpanics`: `panic: later failure`, then
+  a tab and `panic: cleanup failure [recovered, repanicked]`); such a block
+  is a nested panic chain.
 - The record of a leftover: the identity of the header (the run that
   crashed), class `panic`, `PRIORITY=2`, `MESSAGE` = the panic message (its
   lines joined by `\n`, the leading tabs removed) or the first
@@ -234,10 +240,14 @@ lines join with `\n`), `payload.<field>`, `out.frame`, `expect` (`ok` or
   at the next start of the app, and only for the 64 KiB at the start of the
   crash file.
 - When other code recovers the re-panic of `RecoverPanic` and the process
-  later crashes, the later crash gives a record when it is a fatal error or a
-  plain panic. The remaining limit: a later crash that is also a re-panic
-  (` [recovered, repanicked]`) and whose own record was dropped gives no
-  record, because the marker of the earlier panic is in the file.
+  later crashes, the later crash gives a record when it is a fatal error, a
+  plain panic, or a nested panic chain. The remaining limit: a later crash
+  that is a single re-panic (` [recovered, repanicked]`, no nested
+  `panic: ` line) and whose own record was dropped gives no record, because
+  the marker of the earlier panic is in the file.
+- A nested panic chain of a panic that `RecoverPanic` recorded (a deferred
+  function under the recorder panics again) gives a second record at the
+  next start: a duplicate record is better than a lost record.
 
 ## Derived artifacts
 

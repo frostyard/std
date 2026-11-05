@@ -499,3 +499,54 @@ func TestCreateCrashFileName(t *testing.T) {
 		t.Errorf("temporary files left: %q", m)
 	}
 }
+
+// TestNestedPanicAfterRecordedSubprocess: an earlier recorded panic left
+// the marker; a later crash with a nested re-panic chain must still give 1
+// record at the next start.
+func TestNestedPanicAfterRecordedSubprocess(t *testing.T) {
+	state := t.TempDir()
+	dir := filepath.Join(state, "frostyard-problems", testApp)
+	sock, c := listen(t)
+	env := []string{"STATE_DIRECTORY=" + state, "PROBLEMS_TEST_SOCKET=" + sock}
+
+	code, stderr := runHelper(t, "nested-after-recorded", env...)
+	if code != 2 {
+		t.Fatalf("exit code = %d, want 2; stderr:\n%s", code, stderr)
+	}
+	const chain = "panic: later failure\n\tpanic: cleanup failure [recovered, repanicked]\n"
+	if !strings.HasPrefix(stderr, chain) {
+		t.Errorf("stderr does not start with the Go 1.26 nested panic chain:\n%s", stderr)
+	}
+	if rec := readRecord(t, c); rec["MESSAGE"] != "first failure" {
+		t.Errorf("record of panic 1: MESSAGE = %q", rec["MESSAGE"])
+	}
+	expectNone(t, c)
+	files := crashFiles(t, dir)
+	if len(files) != 1 {
+		t.Fatalf("crash files = %q, want 1", files)
+	}
+	data, _ := os.ReadFile(files[0])
+	if !strings.Contains(string(data), recordedMarker+"\n") || !strings.Contains(string(data), chain) {
+		t.Errorf("crash file = %q, want the marker and the chain", data)
+	}
+
+	if code, stderr := runHelper(t, "leftover", env...); code != 0 {
+		t.Fatalf("leftover run: exit code = %d; stderr:\n%s", code, stderr)
+	}
+	rec := readRecord(t, c)
+	if want := "panic: later failure\npanic: cleanup failure [recovered, repanicked]"; rec["MESSAGE"] != want {
+		t.Errorf("MESSAGE = %q, want %q", rec["MESSAGE"], want)
+	}
+	frames := strings.Split(rec["FROSTYARD_FRAMES"], "\n")
+	checkFrames(t, frames)
+	found := false
+	for _, f := range frames {
+		if strings.HasPrefix(f, "github.com/frostyard/std/problems.laterFailure") {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("frames %q do not hold laterFailure", frames)
+	}
+	expectNone(t, c)
+}
