@@ -76,7 +76,7 @@ whichever agent you are:
 
 ```bash
 make check           # fmt + lint + vet + test + coverage floor — the local gate; run before every PR
-make ci              # canonical local gate, sequential and fail-fast: tidy diff, vet, gofmt, lint at the pin, unit+e2e tests, race, cross-arch build of _examples/, the Rust crate (make rust-check) — not a mirror of the GitHub workflow (core ADR-0038)
+make ci              # canonical local gate: runs make verify first (tidy diff and no go.sum, gofmt, lint at the pin, vet, tests), then unit+e2e tests with the coverage profile, race, cross-arch build of _examples/, the Rust crate (make rust-check) — not a mirror of the GitHub workflow; the CI Verify job runs this target (core ADR-0038, ADR-0044, ADR-0073 form 1)
 make verify          # credential-free, non-mutating gate (what a read-only reviewer runs): tidy diff, gofmt -l, lint at the exact pin, vet, tests
 make test            # unit + e2e; asserts subprocess coverage and writes the in-process coverage profile
 make lint            # golangci-lint run (.golangci.yml), module + _examples/
@@ -94,9 +94,12 @@ node scripts/check-docs.mjs            # docs-integrity gate (index, links, alia
 
 `make ci` is the canonical local gate core ADR-0038 requires, not a
 reproduction of [`.github/workflows/ci.yml`](.github/workflows/ci.yml). It runs
-its own checks in one shell, in the order listed above, stopping at the first
-failure; the workflow's jobs declare no `needs:` and run in parallel, so there
-is no CI ordering to mirror. The two are deliberately not the same set:
+`make verify` first, then its own steps, in one shell and in the order listed
+above, stopping at the first failure; the workflow's jobs declare no `needs:`
+and run in parallel, so there is no CI ordering to mirror. The CI `Verify` job
+runs `make ci` (core ADR-0073 form 1), so the local gate and the hosted one
+are the same command (core ADR-0044). The two are deliberately not the same
+set:
 
 - **GitHub only** — the Security Scan job (`govulncheck` over the module and
   the `_examples/` programs), the Docs integrity job
@@ -123,8 +126,9 @@ the resulting covdata reports covered `reporter` statements. That subprocess
 signal is separate from `coverage.out`, whose 95% floor covers `reporter` and
 `problems` code executed inside the `go test` processes (one total over both
 packages, the `-coverpkg` list of `make test` and the CI Unit Tests job).
-The same package-pattern blind spot applies to the analyzers, so `make lint`,
-`make vet`, and the CI Lint and Verify jobs each run a second pass over the
+The same package-pattern blind spot applies to the analyzers, so `make lint`
+and `make vet` (and so `make verify` and the CI Verify job) each run a second
+pass over the
 example package directories named explicitly;
 [`scripts/example-dirs.sh`](scripts/example-dirs.sh) enumerates them (and
 fails when the list is empty), so adding `_examples/<program>/` needs no
@@ -269,6 +273,15 @@ cargo command runs `--locked`.
   RFC3339, and the last event must be `complete`. The suite rejects absent or
   zero reporter covdata. It is part of `go test ./...` and of CI's Unit Tests
   and Race Detection jobs.
+- **Baseline guard** — [`tests/baseline/baseline_test.go`](tests/baseline/baseline_test.go)
+  holds the repository to the frostyard repository baseline (core ADR-0071,
+  `docs/specs/repository-baseline.md`): 1 test per applicable row, B1 to B17,
+  reading the tracked tree with `git ls-files -s -z` and the contents from
+  disk, and skipping when git is unusable. B9 is exempt (a library: pkg.go.dev
+  documents it) and B11 is a follow-up. The pure checks (the `uses:` pin, the
+  checkout credentials, the top-level permissions) have their own table tests.
+  It runs in `go test ./...`, so in `make verify`, `make ci` and CI. A new
+  baseline row needs its test here.
 - New or changed behavior needs a focused test including a failure path;
   exact text formatting is pinned by the tests and by
   [docs/specs/reporter-package.md](docs/specs/reporter-package.md) — change
@@ -293,9 +306,12 @@ harness's independently asserted instrumented-subprocess signal, then the
 **Race Detection** (`go test -race -short ./...`), **Examples Cross-Arch
 Build** (every `_examples/` program directory `GOOS=linux GOARCH=amd64` and
 `GOOS=linux GOARCH=arm64` built, the hosted half of what `make ci` mirrors —
-core ADR-0038), **Verify** (`go mod tidy`
-leaves no diff, `go vet` over the module and the `_examples/` programs,
-`gofmt -l` empty), **Docs integrity** (`node
+core ADR-0038), **Verify** (`make ci`, the canonical gate, in 1 step: form 1
+of ADR-0073, the CI entry of the ADR-0071 row B12; `make ci` runs `make
+verify` first, which covers the tidy diff and the absent `go.sum`, `gofmt`,
+the linter at the pin, `go vet` over the module and the `_examples/`
+programs, and the tests — so the job repeats no step by hand), **Docs
+integrity** (`node
 scripts/check-docs.mjs` — every doc indexed in `docs/README.md`, every
 relative link resolving, every symlink alias intact, thresholds in
 [`.coverage-thresholds.json`](.coverage-thresholds.json), all `1.0`,
@@ -308,7 +324,19 @@ fails pre-merge instead of after an immutable tag is pushed; it runs the
 GoReleaser Pro distribution at the same action SHA `release.yml` uses,
 because the config sets `pro: true`, and needs the org secret
 `GORELEASER_KEY`). Actions are pinned by commit SHA with least-privilege
-permissions (core ADR-0021). `make check` reproduces the Go half locally.
+permissions (core ADR-0021), every checkout sets `persist-credentials:
+false` (baseline row B5), and a job's token scope sits on the job. `make
+check` reproduces the Go half locally.
+
+[`.github/workflows/risk-paths.yml`](.github/workflows/risk-paths.yml) runs
+core's reusable risk-paths workflow (core ADR-0068) on every pull request,
+through `pull_request_target`, so a pull request cannot edit itself out of
+the check. It reads
+[`.github/risk-paths.json`](.github/risk-paths.json), the list of the paths
+this repository treats as high risk (the workflows, the release surface, the
+governance policy, the `Makefile` and the `mise` pins, the gate's scripts),
+and adds the label `risk:high` to a pull request that touches 1. The caller
+is pinned to a full core commit SHA, and the job checks out nothing.
 
 ## Releases
 
@@ -372,12 +400,17 @@ are operator acts (see Agent limits below).
   [.memory/corrections.jsonl](.memory/README.md) (append-only, five fields)
   and are promoted into this file, a doc, or a skill; session continuity
   goes in [.claude/session-summary.md](.claude/session-summary.md).
+- [`SECURITY.md`](SECURITY.md) is the repository's security policy (baseline
+  row B14, core ADR-0040): the supported version, GitHub private
+  vulnerability reporting, and the scope — the journal transport, the
+  reader and record validation as untrusted input, and the crash files of
+  `CrashOutput`.
 
 ## Documentation
 
 **update documentation** After any change to source code, update relevant
-documentation in `AGENTS.md`, `README.md` (if one exists — std has none
-today), and the `docs/` tree. A task is not complete
+documentation in `AGENTS.md`, [`README.md`](README.md), and the `docs/`
+tree. A task is not complete
 without reviewing and updating relevant documentation.
 
 **docs/ tree** All repository documentation lives in the single `docs/`

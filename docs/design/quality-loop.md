@@ -78,17 +78,23 @@ PR template ──► review rubric ──► CI gates ──► corrections ─
     [`_examples/`](#example-programs-are-analyzed-explicitly) program
     directory built with `GOOS=linux GOARCH=amd64` and `GOOS=linux
     GOARCH=arm64`, using the same `scripts/example-dirs.sh` enumeration as the
-    Lint, Security Scan, and Verify jobs. This is the hosted half of what
-    `make ci` mirrors locally (frostyard/core ADR-0038): a program that only
-    fails to cross-compile for one target would otherwise pass every other
-    job unnoticed.
-  - *Verify* — `go mod tidy` leaves no diff (the stdlib-only constraint is
-    visible here: `go.mod` never gains a `require`), `go vet ./...` plus a
-    second `go vet` over the
+    Lint and Security Scan jobs and the `make vet` that `make ci` runs. This
+    is the hosted half of what `make ci` mirrors locally (frostyard/core
+    ADR-0038): a program that only fails to cross-compile for one target would
+    otherwise pass every other job unnoticed.
+  - *Verify* — `make ci` in 1 step, the canonical gate of core ADR-0038 and
+    ADR-0044: this is form 1 of core ADR-0073, the CI entry of the ADR-0071
+    row B12, so the hosted gate and the local one are the same command and a
+    target added to `ci` reaches CI with no edit of
+    [ci.yml](../../.github/workflows/ci.yml). `make ci` runs `make verify`
+    first — the credential-free, non-mutating gate a read-only reviewer runs:
+    `go mod tidy -diff` leaves no diff and no `go.sum` exists (the stdlib-only
+    constraint is visible here), `gofmt -l` is empty, golangci-lint runs at
+    the exact `mise.toml` pin, `go vet ./...` and a second `go vet` over the
     [`_examples/`](#example-programs-are-analyzed-explicitly) program
-    directories, `gofmt -l .` empty. `make verify` is this same
-    credential-free, non-mutating gate run locally, but broader: tidy diff,
-    gofmt -l, lint at the exact pin, vet, and tests.
+    directories report nothing, and `go test ./...` is green. Then come the
+    unit and e2e tests with the coverage profile, the race detector, the
+    cross-arch `_examples/` build, and `make rust-check`.
   - *Docs integrity* (`docs-gate`): `node scripts/check-docs.mjs` checks
     docs-index coverage, relative-link integrity, symlink resolution, and the
     metric's pinned headings against
@@ -122,9 +128,10 @@ they never looked at them. The analyzers therefore receive the example
 package directories by name. [`scripts/example-dirs.sh`](../../scripts/example-dirs.sh)
 enumerates them at run time (every `_examples/*/` directory holding at least
 one `.go` file) and exits non-zero when the list is empty, so a silent
-regression to analyzing nothing fails the gate. The CI Lint, Security Scan,
-Examples Cross-Arch Build, and Verify jobs and the `lint` and `vet` Makefile
-targets all call that one script, which is what keeps the
+regression to analyzing nothing fails the gate. The CI Lint, Security Scan
+and Examples Cross-Arch Build jobs and the `lint` and `vet` Makefile targets
+(and so `make verify`, `make ci` and the Verify job that runs `ci`) all call
+that one script, which is what keeps the
 [`.golangci.yml`](../../.golangci.yml) promise
 that local and CI findings agree, and means a new `_examples/<program>/` is
 analyzed without editing [ci.yml](../../.github/workflows/ci.yml) or the
@@ -170,7 +177,7 @@ Re-run every gate locally before pushing:
 make check
 node scripts/check-docs.mjs
 go test -race -short ./...        # what the Race Detection job runs
-make ci                           # includes what the Examples Cross-Arch Build job runs
+make ci                           # what the Verify job runs; includes the Examples Cross-Arch Build
 ```
 
 Failure modes: a broken alias or missing index line fails docs-gate (fix the
@@ -181,7 +188,8 @@ building or emitting a valid JSON Lines stream ending in `complete` — fix the
 example or the reporter, and update
 [specs/reporter-package.md](../specs/reporter-package.md) if the contract
 moved; a `Verify` failure on `go.mod` almost always means a dependency crept
-in — remove it, std is stdlib-only.
+in — remove it, std is stdlib-only (`make tidy-diff`, in `make verify` and so
+in `make ci`, fails on a new `go.sum`).
 
 ## References
 

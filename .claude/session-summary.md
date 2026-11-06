@@ -9,27 +9,22 @@ commits instead of copying logs.
 
 ## Current state
 
-- ACMM conformance and fleet prerequisites landed (2026-08-18):
-  [ADR-0001](../docs/adr/0001-acmm-conformance-via-canonical-aliases.md)'s
-  alias lattice (`AGENTS.md` canonical; `docs/specs/pr-review-rubric.md`,
-  `docs/specs/pr-acceptance-metric.md`, `docs/design/quality-loop.md`
-  canonical with `docs/review-rubric.md`, `docs/metrics.md`,
-  `docs/quality.md` aliases), the docs-integrity gate
-  (`scripts/check-docs.mjs`, `docs-gate` job in `ci.yml`), the first CI
-  workflow, the `tests/e2e/` example-program suite, `.claude/settings.json`
-  tool-layer limits, `policies/agent-governance.json` (Fluent enrollment
-  surface), and the changelog-only release path
-  (`.goreleaser.yaml` + `release.yml`).
+- The repository baseline PR (core ADR-0071, rows B1 to B17): `make ci` runs
+  `make verify` first and the CI `Verify` job runs `make ci`
+  ([ADR-0073](../docs/org-adrs.md) form 1), `.github/risk-paths.json` with its
+  caller workflow adds the label `risk:high`, the PR template has a risk tier
+  section, every checkout sets `persist-credentials: false`, `SECURITY.md` and
+  a kind-`library` `README.md` exist, `tests/baseline/` guards the rows, and
+  the shipped 2026-03 plans are gone from `docs/plans/` (git history keeps
+  them).
 
 ## Last landed
 
-- #20 skills sync from frostyard/core; #19 concurrent JSON reporter test;
-  #16 dependabot github-actions ecosystem dropped (restored by the
-  conformance PR now that workflows exist).
+- #95 the Rust crate `frostyard-problems` in `rust/`; #94 the `problems`
+  package; #93 the agent-skills sync from frostyard/core.
 
 ## Next
 
-- #17 (CI test and coverage reporting): `ci.yml` now runs the tests; a
-  coverage artifact or baseline is still open — separate work item.
-- First `make bump` after the release workflow merges needs the org
-  `GORELEASER_KEY` secret visible to this repository.
+- The B11 follow-up: move `go.mod`'s toolchain to Go 1.27 with the
+  golangci-lint release the frostyard-go-repo skill's "Fleet toolchain"
+  section names.

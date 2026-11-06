@@ -59,11 +59,13 @@ Beside the Go module, the folder `rust/` holds the Rust crate `frostyard-problem
 │   ├── plans/             # Design documents and implementation plans
 │   └── metrics.md, review-rubric.md, quality.md   # conformance aliases (ADR-0001)
 ├── .github/
-│   ├── workflows/ci.yml   # Lint, Security Scan, Unit Tests, Race Detection, Examples Cross-Arch Build, Verify, Rust crate, Docs integrity, Release config
+│   ├── workflows/ci.yml   # Lint, Security Scan, Unit Tests, Race Detection, Examples Cross-Arch Build, Verify (`make ci`), Rust crate, Docs integrity, Release config
 │   ├── workflows/release.yml  # On tag push: changelog-only GoReleaser release
+│   ├── workflows/risk-paths.yml  # Calls core's reusable workflow: labels a PR that touches a risk path `risk:high` (ADR-0068)
+│   ├── risk-paths.json    # The high-risk paths and why each is one (core risk-paths spec)
 │   ├── pull_request_template.md, ISSUE_TEMPLATE/, prompts/
 │   ├── copilot-instructions.md -> ../AGENTS.md
-│   └── dependabot.yml     # Dependabot config (Go modules + GitHub Actions, weekly)
+│   └── dependabot.yml     # Dependabot config (Go modules, GitHub Actions, the Rust crate, weekly)
 ├── policies/agent-governance.json  # Fluent enrollment surface (core repository-surfaces v1)
 ├── scripts/check-docs.mjs # Docs-integrity gate (index, links, aliases; .coverage-thresholds.json)
 ├── .agents/skills/        # Skills synced from frostyard/core (.claude/skills -> here)
@@ -74,7 +76,9 @@ Beside the Go module, the folder `rust/` holds the Rust crate `frostyard-problem
 ├── .golangci.yml          # What `make lint` and CI run (v2, standard + gofmt)
 ├── .editorconfig
 ├── go.mod                 # Module: github.com/frostyard/std, Go 1.26
-├── Makefile               # Build/test/lint targets
+├── Makefile               # Build/test/lint targets; verify, check and ci are the gate triad
+├── README.md              # Front page, kind `library` (core ADR-0072)
+├── SECURITY.md            # Supported versions, private reporting, scope (row B14)
 └── AGENTS.md              # Canonical agent instructions + contributing guide
                            # (CLAUDE.md, GEMINI.md, CONTRIBUTING.md, .cursorrules,
                            #  .github/copilot-instructions.md symlink to it)
@@ -220,7 +224,9 @@ node scripts/check-docs.mjs   # Docs-integrity gate
 
 CI (`.github/workflows/ci.yml`) runs Lint, Security Scan, Unit Tests, Race
 Detection, Examples Cross-Arch Build (the same cross-compilation `make ci` runs
-locally), Verify (tidy/vet/gofmt), Rust crate (`make rust-check`, also the last
+locally), Verify (`make ci`, the canonical gate, in 1 step — core ADR-0073
+form 1, so the hosted gate and the local one are the same command and `make ci`
+runs `make verify` first), Rust crate (`make rust-check`, also the last
 step of `make ci`), Docs integrity, and Release config on every
 PR, every push to `main`, and every merge-queue branch (`merge_group`);
 the loop around it — template, rubric, gates, corrections, metric, release
@@ -249,11 +255,15 @@ limits at the tool layer. Rationale:
 
 ## Related Plans
 
-Documents in [../plans/](../plans/) provide context for planned and past work:
-
-- **clix module** ([2026-03-04-clix-design.md](../plans/2026-03-04-clix-design.md), [2026-03-04-clix-implementation.md](../plans/2026-03-04-clix-implementation.md)) — A planned separate module (`github.com/frostyard/clix`) that provides CLI convenience functions (version strings, common flags, JSON output helpers, reporter factory) built on fang/cobra. Separate from `std` because it has external dependencies. Three Frostyard CLI tools (nbc, updex, intuneme) are intended consumers. Shipped as [frostyard/clix](https://github.com/frostyard/clix).
-- **reporter extraction** ([2026-03-04-reporter-extraction-design.md](../plans/2026-03-04-reporter-extraction-design.md), [2026-03-04-reporter-extraction.md](../plans/2026-03-04-reporter-extraction.md)) — Design for extracting the reporter package into this standalone module.
-- **reporter examples** ([2026-03-04-reporter-examples-design.md](../plans/2026-03-04-reporter-examples-design.md), [2026-03-04-reporter-examples.md](../plans/2026-03-04-reporter-examples.md)) — Design for the `_examples/` directory demonstrating reporter usage patterns.
+No open plans live in [../plans/](../plans/). The shipped plans of 2026-03 are in
+the git history: the clix module (a separate module,
+[`github.com/frostyard/clix`](https://github.com/frostyard/clix), providing CLI
+convenience functions — version strings, common flags, JSON output helpers, a
+reporter factory — built on fang/cobra; separate from `std` because it has
+external dependencies, and shipped, with nbc, updex and intuneme as consumers),
+the reporter extraction (extracting the `reporter` package from nbc into this
+standalone module), and the reporter examples (the `_examples/` programs that
+demonstrate reporter usage).
 
 ## Downstream Consumers
 
