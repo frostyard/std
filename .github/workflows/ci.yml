@@ -286,6 +286,9 @@ jobs:
         with:
           node-version: "24"
 
+      - name: Self-test the docs integrity checker
+        run: node scripts/test-check-docs.mjs
+
       - name: Check docs index, links, and conformance aliases
         run: node scripts/check-docs.mjs
 
