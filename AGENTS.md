@@ -90,6 +90,7 @@ make rust-check      # Rust crate in rust/: cargo fmt --check, clippy -D warning
 go test -v -run TestName ./reporter/   # run a single unit test
 go test -v ./tests/e2e/...             # the example-program e2e suite alone
 node scripts/check-docs.mjs            # docs-integrity gate (index, links, aliases)
+node scripts/test-check-docs.mjs       # self-test the docs-integrity gate with fixture repositories
 ```
 
 `make ci` is the canonical local gate core ADR-0038 requires, not a
@@ -103,9 +104,10 @@ set:
 
 - **GitHub only** — the Security Scan job (`govulncheck` over the module and
   the `_examples/` programs), the Docs integrity job
-  (`node scripts/check-docs.mjs`), and the Release config job (the goreleaser
-  configuration check) have no step in `make ci`. Run
-  `node scripts/check-docs.mjs` yourself after a docs change.
+  (`node scripts/test-check-docs.mjs`, then `node scripts/check-docs.mjs`),
+  and the Release config job (the goreleaser configuration check) have no
+  step in `make ci`. Run `node scripts/check-docs.mjs` yourself after a docs
+  change, and `node scripts/test-check-docs.mjs` after a change to the gate.
 - **Both, deliberately identical** — the cross-architecture build of every
   `_examples/` program for `linux/amd64` and `linux/arm64` runs in `make ci`
   *and* in the workflow's Examples Cross-Arch Build job (`examples-build`),
@@ -311,7 +313,8 @@ of ADR-0073, the CI entry of the ADR-0071 row B12; `make ci` runs `make
 verify` first, which covers the tidy diff and the absent `go.sum`, `gofmt`,
 the linter at the pin, `go vet` over the module and the `_examples/`
 programs, and the tests — so the job repeats no step by hand), **Docs
-integrity** (`node
+integrity** (`node scripts/test-check-docs.mjs`, the gate's fixture self-test,
+then `node
 scripts/check-docs.mjs` — every doc indexed in `docs/README.md`, every
 relative link resolving, every symlink alias intact, thresholds in
 [`.coverage-thresholds.json`](.coverage-thresholds.json), all `1.0`,
