@@ -54,18 +54,8 @@ Org-wide decisions binding this repo are listed in [org-adrs.md](org-adrs.md).
 
 ### Plans
 
-Shipped work; kept for the decision context they carry:
-
-- [clix design](plans/2026-03-04-clix-design.md) and
-  [clix implementation](plans/2026-03-04-clix-implementation.md) — the CLI
-  convenience module built on this package, shipped as
-  [frostyard/clix](https://github.com/frostyard/clix)
-- [Reporter extraction design](plans/2026-03-04-reporter-extraction-design.md)
-  and [implementation plan](plans/2026-03-04-reporter-extraction.md) —
-  extracting `reporter` from nbc into this module
-- [Reporter examples design](plans/2026-03-04-reporter-examples-design.md)
-  and [implementation plan](plans/2026-03-04-reporter-examples.md) — the
-  `_examples/` programs
+No open plans. The shipped plans of 2026-03 (reporter extraction, reporter
+examples, clix) are in the git history.
 
 ## Conventions
 

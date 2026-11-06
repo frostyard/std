@@ -6,7 +6,7 @@ idiomatic_version_file_enable_tools = ["go"]
 lockfile = true
 
 [tools]
-golangci-lint = "2.13.1"
+golangci-lint = "2.15.0"
 # svu reads .svu.yml only from v3 on; `make bump` refuses any other release.
 svu = "3.4.1"
 # The Rust crate frostyard-problems (rust/, ADR-0003): cargo fmt, clippy and

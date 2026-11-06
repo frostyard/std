@@ -93,9 +93,10 @@ lint-version-check:
 	if [ -n "$$built" ] && [ "$$(printf '%s\n%s\n' "$(GO_TOOLCHAIN)" "$$built" | sort -V | head -1)" != "$(GO_TOOLCHAIN)" ]; then \
 		echo "golangci-lint $(GOLANGCI_LINT_VERSION) was built with go$$built, older than go.mod's toolchain go$(GO_TOOLCHAIN): bump golangci-lint first (core ADR-0043)"; exit 1; fi
 
-## tidy-diff: Fail unless go.mod is tidy (credential-free; std ships no go.sum)
+## tidy-diff: Fail unless go.mod is tidy and no go.sum exists (credential-free; std is stdlib only)
 tidy-diff:
 	$(GO) mod tidy -diff
+	@if [ -e go.sum ]; then echo "go.sum exists: std is stdlib only (no dependencies)"; exit 1; fi
 
 ## gofmt-check: Fail if any Go source file needs gofmt -w
 gofmt-check:
@@ -117,9 +118,12 @@ verify:
 ## check: Run fmt, lint, vet, test, and the coverage floor
 check: fmt lint vet test test-coverage-check coverage-check
 
-# `ci` is this repository's canonical local gate (core ADR-0038), not a
-# reproduction of the GitHub Actions workflow. It runs the checks below
-# sequentially and stops at the first failure; the workflow's jobs declare no
+# `ci` is this repository's canonical local gate (core ADR-0038, ADR-0044), not
+# a reproduction of the GitHub Actions workflow. It runs `make verify` first
+# (tidy diff and no go.sum, gofmt, lint at the pin, vet, tests), then its own
+# steps sequentially, and stops at the first failure. The CI `Verify` job runs
+# `make ci` (core ADR-0073 form 1), so the gate a developer runs and the one
+# GitHub runs are the same command. The workflow's other jobs declare no
 # `needs:` and run in parallel, so there is no CI ordering for this target to
 # mirror. Three workflow jobs have no counterpart here — Security Scan
 # (govulncheck), Docs integrity (`node scripts/check-docs.mjs`), and Release
@@ -132,18 +136,10 @@ check: fmt lint vet test test-coverage-check coverage-check
 # `make rust-check`, checks the Rust crate in rust/ (ADR-0003) with the same
 # commands as the workflow's Rust crate job (`rust`), so it needs cargo from
 # `mise install`. Keep this comment, the `## ci` help line, AGENTS.md's
-# Commands block, and docs/org-adrs.md's ADR-0038 entry saying the same thing.
-## ci: Canonical local gate, sequential and fail-fast — tidy diff, vet, gofmt, lint at the pin, unit+e2e tests, race, cross-arch build of _examples/, the Rust crate (make rust-check). Not a mirror of the GitHub workflow (Security Scan, Docs integrity, Release config, and the coverage floor are not run here; the cross-arch example build is also run on GitHub by the Examples Cross-Arch Build job, and the Rust crate check by the Rust crate job) (core ADR-0038)
-ci:
-	@echo "==> ci: go.mod is tidy"
-	@$(MAKE) --no-print-directory tidy-diff
-	@echo "==> ci: go vet"
-	@$(MAKE) --no-print-directory vet
-	@echo "==> ci: gofmt"
-	@$(MAKE) --no-print-directory gofmt-check
-	@echo "==> ci: golangci-lint $(GOLANGCI_LINT_VERSION) (built with go >= $(GO_TOOLCHAIN))"
-	@$(MAKE) --no-print-directory lint-version-check
-	@$(MAKE) --no-print-directory lint
+# Commands block, and docs/org-adrs.md's ADR-0038 and ADR-0044 entries saying
+# the same thing.
+## ci: Canonical local gate, sequential and fail-fast — `make verify` first (tidy diff and no go.sum, gofmt, lint at the pin, vet, tests), then unit+e2e tests with the coverage profile, race, cross-arch build of _examples/, the Rust crate (make rust-check). Not a mirror of the GitHub workflow (Security Scan, Docs integrity, Release config, and the coverage floor are not run here; the cross-arch example build is also run on GitHub by the Examples Cross-Arch Build job, and the Rust crate check by the Rust crate job); the CI Verify job runs this target (core ADR-0038, ADR-0044, ADR-0073 form 1)
+ci: verify
 	@echo "==> ci: unit tests"
 	@$(MAKE) --no-print-directory test
 	@echo "==> ci: race detector"

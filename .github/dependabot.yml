@@ -10,3 +10,10 @@ updates:
     directory: /
     schedule:
       interval: weekly
+  # The Rust crate frostyard-problems in rust/ (ADR-0003). It has no
+  # dependencies today; this entry keeps baseline row B13 true if one is
+  # added later.
+  - package-ecosystem: cargo
+    directory: /rust
+    schedule:
+      interval: weekly

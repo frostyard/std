@@ -1,15 +1,18 @@
 name: CI
 
 # The PR gate: the Go half mirrors `make check` (fmt, lint, test) plus the
-# race detector, a tidy/vet/gofmt verify job, a cross-architecture build of
-# every _examples/ program (frostyard/core ADR-0038 — this is the hosted half
-# of what `make ci` mirrors), and a govulncheck security scan (pinned v1.7.0
-# — std is dependency-free, so this is the reachable standard-library
-# advisory signal every consumer inherits); docs-gate is the docs-integrity
-# check from ADR-0001; the rust job checks the Rust crate frostyard-problems
-# in rust/ (ADR-0003) with `make rust-check`, on the Rust toolchain that
-# mise.toml pins. Actions are pinned by commit SHA with least-privilege
-# permissions (frostyard/core ADR-0021).
+# race detector, a cross-architecture build of every _examples/ program
+# (frostyard/core ADR-0038 — this is the hosted half of what `make ci`
+# mirrors), and a govulncheck security scan (pinned v1.7.0 — std is
+# dependency-free, so this is the reachable standard-library advisory signal
+# every consumer inherits); docs-gate is the docs-integrity check from
+# ADR-0001; the rust job checks the Rust crate frostyard-problems in rust/
+# (ADR-0003) with `make rust-check`, on the Rust toolchain that mise.toml
+# pins. The Verify job is the CI entry of core ADR-0071 row B12, in form 1 of
+# ADR-0073: it runs `make ci`, the same command a developer runs locally
+# (ADR-0044). Every checkout sets `persist-credentials: false` (ADR-0021, row
+# B5). Actions are pinned by commit SHA with least-privilege permissions
+# (frostyard/core ADR-0021).
 #
 # The same jobs also run on the merge queue's temporary branches
 # (frostyard/core ADR-0042), so every required check reports there. No job
@@ -37,6 +40,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Set up Go
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
@@ -80,6 +85,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Set up Go
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
@@ -108,6 +115,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Set up Go
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
@@ -147,6 +156,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Set up Go
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
@@ -164,6 +175,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Set up Go
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
@@ -193,42 +206,41 @@ jobs:
   verify:
     name: Verify
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     permissions:
       contents: read
     steps:
       - name: Checkout code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Set up Go
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: go.mod
 
-      # std is stdlib-only: there is no go.sum, and a tidy diff (or a new
-      # go.sum) here almost always means a dependency crept in.
-      - name: Verify go.mod is tidy and dependency-free
-        run: |
-          go mod tidy
-          git diff --exit-code -- go.mod
-          test ! -e go.sum
+      # mise.toml and mise.lock are the single source of every tool pin
+      # (core ADR-0043): this installs exactly the locked golangci-lint and
+      # Rust toolchain, checksum-verified, the same way a developer's `mise
+      # install` does. Go still comes from actions/setup-go above (go.mod's
+      # toolchain line).
+      - name: Install pinned tools
+        uses: jdx/mise-action@6be3c7ed4c21d4f76b208d351d95aac273ebb76d # v5.2.4
+        with:
+          install: true
+          install_args: golangci-lint rust
+          cache: true
 
-      - name: Run go vet
-        run: go vet ./...
-
-      # `./...` above skips _examples/ — Go package patterns ignore
-      # directories starting with "_" — so the example programs need their
-      # package directories named explicitly. The list is enumerated at run
-      # time (and the script fails when it is empty), so a new
-      # _examples/<program>/ is vetted without editing this workflow.
-      - name: Run go vet over the _examples programs
-        run: |
-          dirs="$(./scripts/example-dirs.sh)"
-          go vet $dirs
-
-      - name: Check formatting
-        run: |
-          gofmt -l .
-          test -z "$(gofmt -l .)"
+      # This job is the CI entry of core ADR-0071 row B12, in form 1 of
+      # ADR-0073: 1 step runs `make ci`, the canonical gate of ADR-0038 and
+      # ADR-0044. `make ci` runs `make verify` first (tidy diff and no go.sum,
+      # gofmt, lint at the pin, vet, tests), then the unit and e2e tests with
+      # the coverage profile, the race detector, the cross-arch `_examples/`
+      # build, and `make rust-check`. Nothing here repeats a step by hand: a
+      # target added to `ci` reaches CI with no edit of this file.
+      - name: make ci
+        run: make ci
 
   rust:
     name: Rust crate
@@ -238,6 +250,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       # mise.toml pins rust 1.99.1 with clippy, rustfmt and the Windows and
       # macOS targets; mise.lock records the version, and rustup checks each
@@ -264,6 +278,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Set up Node.js
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
@@ -287,6 +303,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Set up Go
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
