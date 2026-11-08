@@ -4,12 +4,18 @@ updates:
     directory: /
     schedule:
       interval: weekly
+    groups:
+      gomod:
+        patterns: ["*"]
   # Restored now that .github/workflows/ exists (it was dropped in #16 while
   # the repo had no workflows): keeps the SHA-pinned actions current.
   - package-ecosystem: github-actions
     directory: /
     schedule:
       interval: weekly
+    groups:
+      actions:
+        patterns: ["*"]
   # The Rust crate frostyard-problems in rust/ (ADR-0003). It has no
   # dependencies today; this entry keeps baseline row B13 true if one is
   # added later.
@@ -17,3 +23,6 @@ updates:
     directory: /rust
     schedule:
       interval: weekly
+    groups:
+      cargo:
+        patterns: ["*"]
