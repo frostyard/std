@@ -12,7 +12,8 @@ commits instead of copying logs.
 - The repository baseline PR (core ADR-0071, rows B1 to B17): `make ci` runs
   `make verify` first and the CI `Verify` job runs `make ci`
   ([ADR-0073](../docs/org-adrs.md) form 1), `.github/risk-paths.json` with its
-  caller workflow adds the label `risk:high`, the PR template has a risk tier
+  caller workflow adds the level label `level:L1` to `level:L4` and
+  `risk:high` at L1 and L2, the PR template has a risk tier
   section, every checkout sets `persist-credentials: false`, `SECURITY.md` and
   a kind-`library` `README.md` exist, `tests/baseline/` guards the rows, and
   the shipped 2026-03 plans are gone from `docs/plans/` (git history keeps
