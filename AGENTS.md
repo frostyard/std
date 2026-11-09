@@ -341,7 +341,10 @@ governance policy, the `Makefile` and the `mise` pins, the gate's scripts),
 and gives the pull request 1 level. It adds the level label `level:L1` to
 `level:L4` from the changed files, and `risk:high` at L1 and L2. The level
 says how much of the change the owner reads: L1 every line, L2 the diff, L3 a
-skim, L4 the title and CI. It also removes `ready-for-human` when the head
+skim, L4 the title and CI. The organization floors can raise the computed
+level, and an existing stricter level label stays (the workflow never lowers
+1). A missing `risk:high` label fails the job; the 4 level labels only give a
+warning when absent. It also removes `ready-for-human` when the head
 moves after the label or when CI is not green at the label, and writes a
 "would auto-merge" shadow comment on some Dependabot pull requests; it never
 merges. The caller is pinned to a full core commit SHA, and the job checks
