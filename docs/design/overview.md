@@ -61,8 +61,8 @@ Beside the Go module, the folder `rust/` holds the Rust crate `frostyard-problem
 ├── .github/
 │   ├── workflows/ci.yml   # Lint, Security Scan, Unit Tests, Race Detection, Examples Cross-Arch Build, Verify (`make ci`), Rust crate, Docs integrity, Release config
 │   ├── workflows/release.yml  # On tag push: changelog-only GoReleaser release
-│   ├── workflows/risk-paths.yml  # Calls core's reusable workflow: labels a PR that touches a risk path `risk:high` (ADR-0068)
-│   ├── risk-paths.json    # The high-risk paths and why each is one (core risk-paths spec)
+│   ├── workflows/risk-paths.yml  # Calls core's reusable PR triage workflow: a level label (`level:L1` to `level:L4`) and `risk:high` at L1 and L2 (ADR-0068, ADR-0077, ADR-0078)
+│   ├── risk-paths.json    # The high-risk paths, the level of each and why it is one (core risk-paths spec)
 │   ├── pull_request_template.md, ISSUE_TEMPLATE/, prompts/
 │   ├── copilot-instructions.md -> ../AGENTS.md
 │   └── dependabot.yml     # Dependabot config (Go modules, GitHub Actions, the Rust crate, weekly)
