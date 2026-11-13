@@ -69,7 +69,7 @@ Beside the Go module, the folder `rust/` holds the Rust crate `frostyard-problem
 ├── policies/agent-governance.json  # Fluent enrollment surface (core repository-surfaces v1)
 ├── scripts/check-docs.mjs # Docs-integrity gate (index, links, aliases; .coverage-thresholds.json)
 ├── .agents/skills/        # Skills synced from frostyard/core (.claude/skills -> here)
-├── .memory/               # Corrections inbox (append-only corrections.jsonl)
+├── .memory/               # Corrections inbox (corrections/: 1 file for each record)
 ├── .claude/               # settings.json (tool-layer limits), session-summary.md
 ├── .goreleaser.yaml       # builds skipped; changelog grouped by commit type
 ├── .svu.yml               # svu (semantic version utility) config for `make bump`

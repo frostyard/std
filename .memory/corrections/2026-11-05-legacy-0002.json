@@ -1,0 +1,7 @@
+{
+  "date": "2026-11-05",
+  "scope": "rust/recorder",
+  "correction": "Recorder::error formats the error only when it can write (Linux, not inert, valid code) and inside catch_unwind, and leaks the payload of a caught panic with mem::forget, so a panicking Display, or a panic payload whose Drop panics, gives the code as MESSAGE and never unwinds into the app (guard: panicking_display_gives_the_code, error_with_panicking_display_returns, panic_payload_with_panicking_drop_gives_the_code, error_with_bomb_payload_returns); map_location keeps a panic location only under <crate_root>src/, where install_panic_hook(manifest_dir) (#[track_caller]) takes the root as the longest prefix of the caller file before a src folder that ends CARGO_MANIFEST_DIR, else \"\" only when \"\" is the only candidate, else none, so vendored, remapped std, sibling and other workspace crates get none (guard: root_from_the_caller_file_and_manifest_dir, nested_member_maps_only_its_own_files, unmatched_single_candidate_maps_nothing, other_files_give_none, vectors rust-panic-vendor-folder, rust-panic-remapped-std, rust-panic-other-workspace-crate, rust-panic-outside-crate-root, rust-panic-nested-member, rust-panic-nested-sibling).",
+  "evidence": "std#95 cross-review",
+  "promoted_to": ""
+}

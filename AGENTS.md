@@ -409,7 +409,7 @@ are operator acts (see Agent limits below).
   release, push to `main`, or force-push; pushing a branch and dispatching a
   workflow ask first; `.env` and secrets are unreadable.
 - Corrections that should outlive a session go in
-  [.memory/corrections.jsonl](.memory/README.md) (append-only, five fields)
+  [.memory/corrections/](.memory/README.md) (1 file for each record, five fields)
   and are promoted into this file, a doc, or a skill; session continuity
   goes in [.claude/session-summary.md](.claude/session-summary.md).
 - [`SECURITY.md`](SECURITY.md) is the repository's security policy (baseline
