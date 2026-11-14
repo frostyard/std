@@ -300,3 +300,39 @@ fn parse_reads_the_format() {
 fn parse_rejects_a_line_without_a_key() {
     parse("vector: a\nno colon here\n");
 }
+
+/// `validate` accepts a Go panic with 1 frame exactly when `map_frame` keeps
+/// that frame, for every frame vector: the writer and the reader apply the
+/// same frame rule.
+#[test]
+fn validate_frame_check_matches_map_frame() {
+    let mut n = 0;
+    let mut failures = Vec::new();
+    for v in load().iter().filter(|v| v.text("type") == "frame") {
+        n += 1;
+        let input = v.text("in.frame");
+        let fields: HashMap<String, String> = [
+            ("MESSAGE_ID", crate::MESSAGE_ID),
+            ("FROSTYARD_SCHEMA", crate::SCHEMA),
+            ("FROSTYARD_APP_ID", "org.frostyard.nsl"),
+            ("FROSTYARD_APP_VERSION", "1.2.3"),
+            ("FROSTYARD_RUNTIME", "go"),
+            ("FROSTYARD_COMPONENT", "cli"),
+            ("FROSTYARD_CLASS", "panic"),
+            ("FROSTYARD_FRAMES", input),
+        ]
+        .into_iter()
+        .map(|(k, v)| (k.to_owned(), v.to_owned()))
+        .collect();
+        let kept = map_frame(input) == input;
+        let valid = validate(&fields).is_ok();
+        if kept != valid {
+            failures.push(format!(
+                "vector {}: map_frame keeps {input:?} = {kept}, validate ok = {valid}",
+                v.name
+            ));
+        }
+    }
+    assert!(n > 0, "no frame vectors");
+    assert!(failures.is_empty(), "{}", failures.join("\n"));
+}

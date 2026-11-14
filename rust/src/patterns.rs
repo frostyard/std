@@ -244,13 +244,20 @@ fn is_frame_tail(rest: &str, min: usize, max: usize, segment: fn(&str) -> bool) 
     (min..=max).contains(&count)
 }
 
+/// A frame that schema v1 allows (Go `allowedFrame`): it matches the v1
+/// frame pattern and is at most 160 bytes. [`crate::validate`] and
+/// [`map_frame`] both use it.
+pub(crate) fn is_allowed_frame(s: &str) -> bool {
+    s.len() <= MAX_FRAME_LEN && is_frame(s)
+}
+
 /// The frame mapping of a writer (Go `MapFrame`): `name` when it matches the
 /// v1 frame pattern and is at most 160 bytes, else `other`. The Rust writer
 /// writes no frames; the tests run it against every `frame` vector, so that
 /// the frame check of [`crate::validate`] is the same as in Go.
 #[cfg(test)]
 pub(crate) fn map_frame(name: &str) -> &str {
-    if name.len() <= MAX_FRAME_LEN && is_frame(name) {
+    if is_allowed_frame(name) {
         name
     } else {
         "other"

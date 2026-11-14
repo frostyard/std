@@ -330,3 +330,34 @@ func checkValidate(t *testing.T, v vector) {
 		t.Fatalf("bad expect %q", v.get("expect"))
 	}
 }
+
+// TestValidateFrameMatchesMapFrame checks that Validate accepts a Go panic
+// with 1 frame exactly when MapFrame keeps that frame, for every frame vector:
+// the writer and the reader apply the same frame rule.
+func TestValidateFrameMatchesMapFrame(t *testing.T) {
+	n := 0
+	for _, v := range loadVectors(t) {
+		if v.get("type") != "frame" {
+			continue
+		}
+		n++
+		in := v.get("in.frame")
+		fields := map[string]string{
+			fieldMessageID:  MessageID,
+			fieldSchema:     Schema,
+			fieldAppID:      "org.frostyard.nsl",
+			fieldAppVersion: "1.2.3",
+			fieldRuntime:    "go",
+			fieldComponent:  "cli",
+			fieldClass:      "panic",
+			fieldFrames:     in,
+		}
+		_, err := Validate(fields)
+		if kept := MapFrame(in) == in; kept != (err == nil) {
+			t.Errorf("vector %s: MapFrame keeps %q = %v, but Validate = %v", v.name, in, kept, err)
+		}
+	}
+	if n == 0 {
+		t.Fatal("no frame vectors")
+	}
+}
