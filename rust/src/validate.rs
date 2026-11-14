@@ -4,8 +4,8 @@ use std::collections::HashMap;
 use std::fmt;
 
 use crate::patterns::{
-    MAX_FRAME_LEN, MAX_FRAMES, MAX_LOCATION_LEN, is_app_id, is_class, is_code, is_component,
-    is_frame, is_location, is_runtime, is_semver,
+    MAX_FRAMES, MAX_LOCATION_LEN, is_allowed_frame, is_app_id, is_class, is_code, is_component,
+    is_location, is_runtime, is_semver,
 };
 use crate::{MESSAGE_ID, SCHEMA};
 
@@ -159,7 +159,7 @@ pub fn validate(fields: &HashMap<String, String>) -> Result<Detail, Invalid> {
         if list.len() > MAX_FRAMES {
             return invalid(format!("more than {MAX_FRAMES} frames"));
         }
-        if list.iter().any(|f| f.len() > MAX_FRAME_LEN || !is_frame(f)) {
+        if list.iter().any(|f| !is_allowed_frame(f)) {
             return invalid("bad frame");
         }
         d.frames = list.into_iter().map(str::to_owned).collect();

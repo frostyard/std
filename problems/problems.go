@@ -99,10 +99,17 @@ var (
 // matches the v1 frame pattern and is at most 160 bytes), and "other"
 // otherwise.
 func MapFrame(name string) string {
-	if len(name) <= maxFrameLen && frameRe.MatchString(name) {
+	if allowedFrame(name) {
 		return name
 	}
 	return otherFrame
+}
+
+// allowedFrame reports whether name is a frame that schema v1 allows: it
+// matches the v1 frame pattern and is at most 160 bytes. MapFrame (the
+// writer) and Validate (the reader) both use it.
+func allowedFrame(name string) bool {
+	return len(name) <= maxFrameLen && frameRe.MatchString(name)
 }
 
 // Detail holds the S8 app_problem detail fields of a valid record. Its JSON
@@ -198,7 +205,7 @@ func Validate(fields map[string]string) (Detail, error) {
 			return d, invalid("more than %d frames", maxFrames)
 		}
 		for _, f := range list {
-			if len(f) > maxFrameLen || !frameRe.MatchString(f) {
+			if !allowedFrame(f) {
 				return d, invalid("bad frame")
 			}
 		}
