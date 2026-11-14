@@ -425,6 +425,110 @@ func TestStaleCrashNew(t *testing.T) {
 	expectNone(t, c) // a .crash-new file is never parsed
 }
 
+// lockFile holds an exclusive flock on path until the test ends, as a live
+// process holds its own crash file.
+func lockFile(t *testing.T, path string) {
+	t.Helper()
+	f, err := os.Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = f.Close() })
+	if err := syscall.Flock(int(f.Fd()), syscall.LOCK_EX|syscall.LOCK_NB); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// leftNames returns the base names of the files in dir that match pattern.
+func leftNames(t *testing.T, dir, pattern string) string {
+	t.Helper()
+	m, err := filepath.Glob(filepath.Join(dir, pattern))
+	if err != nil {
+		t.Fatal(err)
+	}
+	names := make([]string, len(m))
+	for i, p := range m {
+		names[i] = filepath.Base(p)
+	}
+	return strings.Join(names, ",")
+}
+
+// TestProcessLeftoversLimitOrder checks that the leftover scan takes the
+// crash files in name order, that a locked file is skipped and does not
+// count toward the cap, and that it stops after crashMaxPerStart files.
+func TestProcessLeftoversLimitOrder(t *testing.T) {
+	sock, c := listen(t)
+	resetRate(t)
+	dir := t.TempDir()
+	for i := range 11 {
+		writeFile(t, filepath.Join(dir, fmt.Sprintf("%02d.crash", i)), crashFixtureHeader)
+	}
+	lockFile(t, filepath.Join(dir, "03.crash"))
+
+	New(testApp, "1.0.0", ComponentCLI, WithSocket(sock)).processLeftovers(dir)
+
+	if got, want := leftNames(t, dir, "*.crash"), "03.crash,09.crash,10.crash"; got != want {
+		t.Errorf("crash files left = %q, want %q", got, want)
+	}
+	expectNone(t, c)
+}
+
+// TestStaleCrashNewLimitOrder checks that the stale *.crash-new scan takes
+// the files in name order, that a locked or fresh file is kept and does not
+// count toward the cap, and that it stops after crashMaxPerStart removals.
+func TestStaleCrashNewLimitOrder(t *testing.T) {
+	sock, c := listen(t)
+	resetRate(t)
+	dir := t.TempDir()
+	old := time.Now().Add(-2 * time.Hour)
+	for i := range 12 {
+		p := filepath.Join(dir, fmt.Sprintf("%02d.crash-new", i))
+		writeFile(t, p, crashFixturePanic)
+		if i == 5 {
+			continue // fresh: a live process that has not locked it yet
+		}
+		if err := os.Chtimes(p, old, old); err != nil {
+			t.Fatal(err)
+		}
+	}
+	lockFile(t, filepath.Join(dir, "02.crash-new"))
+
+	New(testApp, "1.0.0", ComponentCLI, WithSocket(sock)).processLeftovers(dir)
+
+	want := "02.crash-new,05.crash-new,10.crash-new,11.crash-new"
+	if got := leftNames(t, dir, "*.crash-new"); got != want {
+		t.Errorf(".crash-new files left = %q, want %q", got, want)
+	}
+	expectNone(t, c) // a .crash-new file is never parsed
+}
+
+// TestProcessLeftoversBothCaps checks that the *.crash-new scan runs, with a
+// cap of its own, also after the *.crash scan reached its cap.
+func TestProcessLeftoversBothCaps(t *testing.T) {
+	sock, c := listen(t)
+	resetRate(t)
+	dir := t.TempDir()
+	old := time.Now().Add(-2 * time.Hour)
+	for i := range 10 {
+		writeFile(t, filepath.Join(dir, fmt.Sprintf("%02d.crash", i)), crashFixtureHeader)
+		p := filepath.Join(dir, fmt.Sprintf("%02d.crash-new", i))
+		writeFile(t, p, crashFixturePanic)
+		if err := os.Chtimes(p, old, old); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	New(testApp, "1.0.0", ComponentCLI, WithSocket(sock)).processLeftovers(dir)
+
+	if got, want := leftNames(t, dir, "*.crash"), "08.crash,09.crash"; got != want {
+		t.Errorf("crash files left = %q, want %q", got, want)
+	}
+	if got, want := leftNames(t, dir, "*.crash-new"), "08.crash-new,09.crash-new"; got != want {
+		t.Errorf(".crash-new files left = %q, want %q", got, want)
+	}
+	expectNone(t, c)
+}
+
 // TestRecoverPanicMultilineSubprocess: a recorded panic with a multi-line
 // value gives no second record from its crash file.
 func TestRecoverPanicMultilineSubprocess(t *testing.T) {
