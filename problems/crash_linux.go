@@ -137,25 +137,22 @@ func crashDir(appID string) (string, error) {
 // published its crash file. A younger one can belong to a live process that
 // has not locked it yet.
 func (r *Recorder) processLeftovers(dir string) {
-	paths, _ := filepath.Glob(filepath.Join(dir, "*"+crashSuffix))
+	forEachCapped(dir, crashSuffix, r.processLeftover)
+	forEachCapped(dir, crashNewSuffix, removeStaleNew)
+}
+
+// forEachCapped calls handle for each file in dir whose name ends with
+// suffix, in name order, and stops after handle returned true
+// crashMaxPerStart times.
+func forEachCapped(dir, suffix string, handle func(string) bool) {
+	paths, _ := filepath.Glob(filepath.Join(dir, "*"+suffix))
 	slices.Sort(paths)
 	done := 0
 	for _, p := range paths {
 		if done == crashMaxPerStart {
-			break
-		}
-		if r.processLeftover(p) {
-			done++
-		}
-	}
-	stale, _ := filepath.Glob(filepath.Join(dir, "*"+crashNewSuffix))
-	slices.Sort(stale)
-	done = 0
-	for _, p := range stale {
-		if done == crashMaxPerStart {
 			return
 		}
-		if removeStaleNew(p) {
+		if handle(p) {
 			done++
 		}
 	}
