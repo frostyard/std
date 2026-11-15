@@ -35,8 +35,19 @@ Contract:
 - **Permanent:** a record file is never removed or renamed. Its text never
   changes, except that an empty `promoted_to` is filled once.
 - frostyard/core's `scripts/new-correction.mjs` writes a record file in the
-  canonical form, and its `scripts/check-corrections.mjs --root .` checks the
-  folder; a file written by hand is fine when it passes.
+  canonical form; a file written by hand is fine when it passes.
+- **Checked locally.** This repository runs core's validator as its own copy:
+  [`scripts/check-corrections.mjs`](../scripts/check-corrections.mjs) is a
+  byte-identical copy of
+  [core's script](https://github.com/frostyard/core/blob/main/scripts/check-corrections.mjs)
+  (change it in core, then copy it, never here). `node
+  scripts/check-corrections.mjs` (or `make corrections-check`) checks the form
+  of every record. `make corrections-base BASE=<ref>` adds the append-only
+  comparison (`--base`): no record is removed, renamed or changed, except that
+  an empty `promoted_to` is filled once. `make ci` runs both, and CI passes
+  `BASE`, the pull request's base commit, so that comparison runs on every pull
+  request. `tests/baseline/corrections_gate_test.go` fails when this wiring is
+  removed.
 
 - `promoted_to` starts empty; when a correction graduates into
   [AGENTS.md](../AGENTS.md), a doc under [docs/](../docs/README.md), or a

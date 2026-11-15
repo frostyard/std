@@ -1,0 +1,7 @@
+{
+  "date": "2026-11-15",
+  "scope": "tests/baseline/corrections_gate_test.go",
+  "correction": "A guard that checks a Makefile recipe must read that rule's own recipe, not the whole Makefile: another rule can hold the same command and hide its removal.",
+  "evidence": "frostyard/std#114 cross-review: removing the validator line from corrections-check left the guard green; the table case 'corrections-check no longer runs the validator' now fails without the fix",
+  "promoted_to": ""
+}
