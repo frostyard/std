@@ -160,6 +160,132 @@ func TestJobInstallsNode(t *testing.T) {
 	}
 }
 
+// correctionsMakefileProblems reports what is wrong with the corrections
+// wiring of 1 Makefile text: the 2 rules exist, the validator runs in the
+// corrections-check recipe itself, `ci` reaches both rules, and corrections-base
+// runs the append-only comparison and refuses a BASE that does not resolve.
+//
+// The validator is looked for in that rule's own recipe, never in the whole
+// Makefile: corrections-base runs the same script with --base, so a search over
+// the file stays green when the format check loses its command.
+func correctionsMakefileProblems(makefile string) []string {
+	var findings []string
+	for _, target := range []string{"corrections-check", "corrections-base"} {
+		if !strings.Contains(makefile, "\n"+target+":") {
+			findings = append(findings, "the Makefile has no "+target+" rule")
+		}
+	}
+	check := strings.Join(makeRuleBody(makefile, "corrections-check"), "\n")
+	if !strings.Contains(check, "node scripts/check-corrections.mjs") {
+		findings = append(findings, "the corrections-check recipe does not run node scripts/check-corrections.mjs"+recipeDetail(check))
+	}
+	// `ci` must reach both, so the gate runs where CI runs `make ci` and in a
+	// developer's local gate.
+	for _, target := range []string{"corrections-check", "corrections-base"} {
+		if !ciReaches(makefile, target) {
+			findings = append(findings, "the ci rule no longer runs "+target+", so the corrections gate stops running in make ci and in CI")
+		}
+	}
+	base := strings.Join(makeRuleBody(makefile, "corrections-base"), "\n")
+	if !strings.Contains(base, `--base "$(BASE)"`) {
+		findings = append(findings, "the corrections-base recipe no longer runs the check with --base \"$(BASE)\""+recipeDetail(base))
+	}
+	if !strings.Contains(base, "does not resolve to a commit") {
+		findings = append(findings, "the corrections-base recipe lost the refusal of a BASE that does not resolve to a commit, so an unfetched ref would pass silently"+recipeDetail(base))
+	}
+	return findings
+}
+
+// recipeDetail names a recipe in a finding: its lines, or that it is empty.
+func recipeDetail(recipe string) string {
+	if recipe == "" {
+		return " (its recipe is empty)"
+	}
+	return " (its recipe is:\n" + recipe + ")"
+}
+
+// correctionsMakefile is a Makefile with the corrections gate wired correctly:
+// the validator in the corrections-check recipe, the append-only comparison in
+// corrections-base, and both reached from `ci`.
+const correctionsMakefile = `ci: verify
+	@$(MAKE) --no-print-directory corrections-check
+	@$(MAKE) --no-print-directory corrections-base
+
+corrections-check:
+	@command -v node >/dev/null 2>&1 || { echo "mise install"; exit 1; }
+	node scripts/check-corrections.mjs
+
+corrections-base:
+	@if [ -z "$(BASE)" ]; then exit 0; fi; \
+	if ! git rev-parse --verify --quiet "$(BASE)^{commit}" >/dev/null; then \
+		echo "FAIL: BASE $(BASE) does not resolve to a commit (fetch it first)"; \
+		exit 1; \
+	fi; \
+	node scripts/check-corrections.mjs --base "$(BASE)"
+`
+
+// correctionsValidator is the validator line of the corrections-check recipe in
+// correctionsMakefile: the removal case takes out only this line.
+const correctionsValidator = "\tnode scripts/check-corrections.mjs\n"
+
+func TestCorrectionsMakefileProblems(t *testing.T) {
+	tests := []struct {
+		name     string
+		makefile string
+		want     string // "" means no finding
+	}{
+		{
+			name:     "the gate is wired",
+			makefile: correctionsMakefile,
+		},
+		{
+			name:     "corrections-check no longer runs the validator",
+			makefile: strings.Replace(correctionsMakefile, correctionsValidator, "", 1),
+			want:     "the corrections-check recipe does not run node scripts/check-corrections.mjs",
+		},
+		{
+			name:     "the corrections-check rule is gone",
+			makefile: strings.Replace(correctionsMakefile, "corrections-check:\n", "", 1),
+			want:     "the Makefile has no corrections-check rule",
+		},
+		{
+			name:     "ci no longer runs corrections-check",
+			makefile: strings.Replace(correctionsMakefile, "\t@$(MAKE) --no-print-directory corrections-check\n", "", 1),
+			want:     "the ci rule no longer runs corrections-check",
+		},
+		{
+			name:     "ci no longer runs corrections-base",
+			makefile: strings.Replace(correctionsMakefile, "\t@$(MAKE) --no-print-directory corrections-base\n", "", 1),
+			want:     "the ci rule no longer runs corrections-base",
+		},
+		{
+			name:     "corrections-base compares no base",
+			makefile: strings.Replace(correctionsMakefile, `--base "$(BASE)"`, "--base", 1),
+			want:     `the corrections-base recipe no longer runs the check with --base`,
+		},
+		{
+			name:     "corrections-base lost the refusal",
+			makefile: strings.Replace(correctionsMakefile, "does not resolve to a commit", "is unreachable", 1),
+			want:     "the corrections-base recipe lost the refusal",
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			findings := correctionsMakefileProblems(test.makefile)
+			if test.want == "" {
+				noFindings(t, "correctionsMakefileProblems", findings)
+				return
+			}
+			for _, finding := range findings {
+				if strings.Contains(finding, test.want) {
+					return
+				}
+			}
+			t.Errorf("correctionsMakefileProblems = %v, want a finding that names %q", findings, test.want)
+		})
+	}
+}
+
 // TestCorrectionsGate fails when the repository can no longer check its
 // records: the script is gone, `make ci` stopped running the 2 corrections
 // targets, corrections-base lost its refusal of an unresolvable BASE, the
@@ -171,35 +297,7 @@ func TestCorrectionsGate(t *testing.T) {
 	if _, err := os.Stat(filepath.Join(r.root, correctionsScript)); err != nil {
 		t.Fatalf("%s is missing (core's script, copied here byte for byte): %v", correctionsScript, err)
 	}
-	makefile := r.read(t, "Makefile")
-
-	// The 2 targets, and the command the format check runs.
-	if !strings.Contains(makefile, "\ncorrections-check:") {
-		t.Error("the Makefile has no corrections-check rule (the format check of every record)")
-	}
-	if !strings.Contains(makefile, "\ncorrections-base:") {
-		t.Error("the Makefile has no corrections-base rule (the append-only comparison with BASE)")
-	}
-	if !strings.Contains(makefile, "node scripts/check-corrections.mjs") {
-		t.Error("the Makefile does not run node scripts/check-corrections.mjs")
-	}
-
-	// `ci` must reach both, so the gate runs where CI runs `make ci` and in a
-	// developer's local gate.
-	for _, target := range []string{"corrections-check", "corrections-base"} {
-		if !ciReaches(makefile, target) {
-			t.Errorf("the ci rule no longer runs %s, so the corrections gate stops running in make ci and in CI", target)
-		}
-	}
-
-	// The comparison itself, and the refusal a typo must not turn into a pass.
-	base := strings.Join(makeRuleBody(makefile, "corrections-base"), "\n")
-	if !strings.Contains(base, `--base "$(BASE)"`) {
-		t.Errorf("corrections-base no longer runs the check with --base \"$(BASE)\"; recipe:\n%s", base)
-	}
-	if !strings.Contains(base, "does not resolve to a commit") {
-		t.Errorf("corrections-base lost the refusal of a BASE that does not resolve to a commit, so an unfetched ref would pass silently; recipe:\n%s", base)
-	}
+	noFindings(t, "Makefile (corrections gate)", correctionsMakefileProblems(r.read(t, "Makefile")))
 
 	// Both steps run node, so the gate needs the pin (core ADR-0043).
 	if !strings.Contains(r.read(t, "mise.toml"), `node = "24"`) {
