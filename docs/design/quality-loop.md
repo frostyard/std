@@ -92,9 +92,20 @@ PR template ──► review rubric ──► CI gates ──► corrections ─
     constraint is visible here), `gofmt -l` is empty, golangci-lint runs at
     the exact `mise.toml` pin, `go vet ./...` and a second `go vet` over the
     [`_examples/`](#example-programs-are-analyzed-explicitly) program
-    directories report nothing, and `go test ./...` is green. Then come the
+    directories report nothing, and `go test ./...` is green. The first steps
+    are the corrections ones, which are cheap and run early so they fail fast:
+    `make corrections-check` (the format of every record through
+    [`scripts/check-corrections.mjs`](../../scripts/check-corrections.mjs)) and
+    `make corrections-base`, which compares the records in
+    [.memory/corrections/](../../.memory/README.md) with `BASE`. Then come the
     unit and e2e tests with the coverage profile, the race detector, the
-    cross-arch `_examples/` build, and `make rust-check`.
+    cross-arch `_examples/` build, and `make rust-check`. The job sets
+    `BASE: ${{ github.event.pull_request.base.sha }}` and checks out the full
+    history (`fetch-depth: 0`) for it, so a pull request can add a record and
+    fill an empty `promoted_to` once, and can never remove, rename or rewrite
+    one (core ADR-0081). On a push or merge-group event `BASE` is empty and the
+    comparison is skipped. The job installs Node from `mise.lock` for the 2
+    steps.
   - *Docs integrity* (`docs-gate`): `node scripts/check-docs.mjs` checks
     docs-index coverage, relative-link integrity, symlink resolution, and the
     metric's pinned headings against
@@ -138,8 +149,19 @@ analyzed without editing [ci.yml](../../.github/workflows/ci.yml) or the
 [`Makefile`](../../Makefile).
 - **Learn** — corrections land in
   [.memory/corrections/](../../.memory/README.md) (1 file for each record,
-  five-field schema, never removed or renamed) and are promoted into `AGENTS.md`, docs, or skills;
-  promotion is the only sanctioned duplication. Session continuity lives in
+  five-field schema, never removed or renamed; core ADR-0081) and are promoted
+  into `AGENTS.md`, docs, or skills; promotion is the only sanctioned
+  duplication. The inbox is checked, not trusted: `make corrections-check`
+  validates every record with
+  [`scripts/check-corrections.mjs`](../../scripts/check-corrections.mjs) (core's
+  script, copied byte for byte — change it in core, then copy it), and `make
+  corrections-base BASE=<ref>` adds the append-only comparison with a base
+  commit. Both are the first 2 steps of `make ci`, right after `make verify`,
+  so the format and the append-only rule hold on every pull request; a `BASE`
+  that does not resolve to a commit fails rather than passing as an old base,
+  and a base that predates the gate is named in a notice.
+  [`tests/baseline/corrections_gate_test.go`](../../tests/baseline/corrections_gate_test.go)
+  fails when that wiring is removed. Session continuity lives in
   [.claude/session-summary.md](../../.claude/session-summary.md).
 - **Enforce mechanically** — [.claude/settings.json](../../.claude/settings.json)
   denies the forbidden acts at the tool layer: merging PRs (`gh pr merge`),
@@ -178,6 +200,8 @@ make check
 node scripts/check-docs.mjs
 go test -race -short ./...        # what the Race Detection job runs
 make ci                           # what the Verify job runs; includes the Examples Cross-Arch Build
+make corrections-check            # the corrections gate alone: the form of every record
+make corrections-base BASE=origin/main   # ... plus the append-only comparison with a base commit
 ```
 
 Failure modes: a broken alias or missing index line fails docs-gate (fix the
@@ -189,7 +213,10 @@ example or the reporter, and update
 [specs/reporter-package.md](../specs/reporter-package.md) if the contract
 moved; a `Verify` failure on `go.mod` almost always means a dependency crept
 in — remove it, std is stdlib-only (`make tidy-diff`, in `make verify` and so
-in `make ci`, fails on a new `go.sum`).
+in `make ci`, fails on a new `go.sum`); a corrections failure means the record
+file itself is wrong (its name, its 5 fields, its canonical bytes) or, with
+`BASE`, that a pull request removed, renamed or rewrote a record — fix the
+record or add a new one, never edit an old one into passing.
 
 ## References
 

@@ -68,6 +68,7 @@ Beside the Go module, the folder `rust/` holds the Rust crate `frostyard-problem
 │   └── dependabot.yml     # Dependabot config (Go modules, GitHub Actions, the Rust crate, weekly)
 ├── policies/agent-governance.json  # Fluent enrollment surface (core repository-surfaces v1)
 ├── scripts/check-docs.mjs # Docs-integrity gate (index, links, aliases; .coverage-thresholds.json)
+├── scripts/check-corrections.mjs  # Corrections gate (byte-identical copy of core's script; make corrections-check, make corrections-base)
 ├── .agents/skills/        # Skills synced from frostyard/core (.claude/skills -> here)
 ├── .memory/               # Corrections inbox (corrections/: 1 file for each record)
 ├── .claude/               # settings.json (tool-layer limits), session-summary.md
@@ -219,6 +220,7 @@ make lint            # Run golangci-lint (.golangci.yml)
 make test-cover      # Tests with coverage + HTML report
 make bump            # Tag next semver with svu and push (triggers release.yml)
 make rust-check      # Rust crate: fmt, clippy, tests, Windows/macOS check builds, no dependency
+make corrections-check  # Corrections gate: the form of every record in .memory/corrections/
 node scripts/check-docs.mjs   # Docs-integrity gate
 ```
 
@@ -226,8 +228,8 @@ CI (`.github/workflows/ci.yml`) runs Lint, Security Scan, Unit Tests, Race
 Detection, Examples Cross-Arch Build (the same cross-compilation `make ci` runs
 locally), Verify (`make ci`, the canonical gate, in 1 step — core ADR-0073
 form 1, so the hosted gate and the local one are the same command and `make ci`
-runs `make verify` first), Rust crate (`make rust-check`, also the last
-step of `make ci`), Docs integrity, and Release config on every
+runs `make verify` first), Rust crate (`make rust-check`, also the last step of
+`make ci`), Docs integrity, and Release config on every
 PR, every push to `main`, and every merge-queue branch (`merge_group`);
 the loop around it — template, rubric, gates, corrections, metric, release
 path — is described in [quality-loop.md](quality-loop.md).

@@ -1,4 +1,4 @@
-.PHONY: all clean fmt lint lint-version-check vet verify tidy-diff gofmt-check test test-cover coverage-check test-coverage-check tidy check ci rust-check svu-version-check bump help
+.PHONY: all clean fmt lint lint-version-check vet verify tidy-diff gofmt-check test test-cover coverage-check test-coverage-check tidy check ci corrections-check corrections-base rust-check svu-version-check bump help
 
 # Go commands
 GO := go
@@ -115,6 +115,36 @@ verify:
 	@echo "==> verify: tests"
 	$(GO) test ./...
 
+## corrections-check: Check the format of every record in .memory/corrections/ (scripts/check-corrections.mjs, core ADR-0081; needs node from mise install)
+corrections-check:
+	@command -v node >/dev/null 2>&1 || { \
+		echo "node not installed; provision every pinned tool with:"; \
+		echo "mise install"; \
+		exit 1; \
+	}
+	node scripts/check-corrections.mjs
+
+# The corrections check compares the record files in .memory/corrections/ with
+# BASE: no record is removed, renamed or changed, except that an empty
+# promoted_to may be filled in once. The old single file must not come back.
+# The contract starts with the gate: a BASE that does not hold
+# scripts/check-corrections.mjs had no such rule, so the comparison is skipped
+# with a notice. Every BASE after the adoption holds the script.
+#
+# A BASE that does not resolve to a commit is an error, never an old base: a
+# typo or an unfetched ref must not turn the comparison into a silent pass.
+corrections-base:
+	@if [ -z "$(BASE)" ]; then exit 0; fi; \
+	if ! git rev-parse --verify --quiet "$(BASE)^{commit}" >/dev/null; then \
+		echo "FAIL: BASE $(BASE) does not resolve to a commit (fetch it first)"; \
+		exit 1; \
+	fi; \
+	if git cat-file -e "$(BASE):scripts/check-corrections.mjs" 2>/dev/null; then \
+		node scripts/check-corrections.mjs --base "$(BASE)"; \
+	else \
+		echo "==> corrections: BASE $(BASE) predates the corrections gate; append-only comparison skipped"; \
+	fi
+
 ## check: Run fmt, lint, vet, test, and the coverage floor
 check: fmt lint vet test test-coverage-check coverage-check
 
@@ -135,11 +165,21 @@ check: fmt lint vet test test-coverage-check coverage-check
 # linux/amd64 and linux/arm64 pair, so the two cannot drift. The last step,
 # `make rust-check`, checks the Rust crate in rust/ (ADR-0003) with the same
 # commands as the workflow's Rust crate job (`rust`), so it needs cargo from
-# `mise install`. Keep this comment, the `## ci` help line, AGENTS.md's
-# Commands block, and docs/org-adrs.md's ADR-0038 and ADR-0044 entries saying
-# the same thing.
-## ci: Canonical local gate, sequential and fail-fast — `make verify` first (tidy diff and no go.sum, gofmt, lint at the pin, vet, tests), then unit+e2e tests with the coverage profile, race, cross-arch build of _examples/, the Rust crate (make rust-check). Not a mirror of the GitHub workflow (Security Scan, Docs integrity, Release config, and the coverage floor are not run here; the cross-arch example build is also run on GitHub by the Examples Cross-Arch Build job, and the Rust crate check by the Rust crate job); the CI Verify job runs this target (core ADR-0038, ADR-0044, ADR-0073 form 1)
+# `mise install`. The first steps after `make verify` are the corrections ones:
+# `make corrections-check` checks the format of every record in
+# .memory/corrections/ and `make corrections-base`, when BASE is set, compares
+# them with BASE (the append-only rule of core ADR-0081). They are cheap and run
+# early so they fail fast; the Verify job passes BASE, the pull request's base
+# commit, so a record is never removed, renamed or changed in a pull request. On
+# a push to `main` or a merge-queue branch BASE is empty and the comparison is
+# skipped; both steps need node from `mise install`. Keep this comment, the
+# `## ci` help line, AGENTS.md's Commands block, and docs/org-adrs.md's
+# ADR-0038 and ADR-0044 entries saying the same thing.
+## ci: Canonical local gate, sequential and fail-fast — `make verify` first (tidy diff and no go.sum, gofmt, lint at the pin, vet, tests), then the corrections check (make corrections-check, then make corrections-base against BASE when it is set), then unit+e2e tests with the coverage profile, race, cross-arch build of _examples/, and the Rust crate (make rust-check). Not a mirror of the GitHub workflow (Security Scan, Docs integrity, Release config, and the coverage floor are not run here; the cross-arch example build is also run on GitHub by the Examples Cross-Arch Build job, and the Rust crate check by the Rust crate job); the CI Verify job runs this target with BASE set to the pull request's base commit (core ADR-0038, ADR-0044, ADR-0073 form 1)
 ci: verify
+	@echo "==> ci: corrections"
+	@$(MAKE) --no-print-directory corrections-check
+	@$(MAKE) --no-print-directory corrections-base
 	@echo "==> ci: unit tests"
 	@$(MAKE) --no-print-directory test
 	@echo "==> ci: race detector"

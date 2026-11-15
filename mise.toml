@@ -7,6 +7,9 @@ lockfile = true
 
 [tools]
 golangci-lint = "2.15.0"
+# The corrections gate (scripts/check-corrections.mjs) and the docs gate
+# (scripts/check-docs.mjs) run on Node; `make ci` needs it, so it is pinned.
+node = "24"
 # svu reads .svu.yml only from v3 on; `make bump` refuses any other release.
 svu = "3.4.1"
 # The Rust crate frostyard-problems (rust/, ADR-0003): cargo fmt, clippy and

@@ -69,14 +69,18 @@ whichever agent you are:
   `x86_64-apple-darwin` targets; `mise install` provides it. `make
   rust-check` (and so `make ci`) fails with `mise install` when `cargo` is
   absent
-- Node 24+ only for `node scripts/check-docs.mjs` (zero dependencies);
-  the 20.x line reached end-of-life on 2026-04-30, and 24 is the Active LTS
+- Node 24 is pinned in `mise.toml` (with its checksums in `mise.lock`,
+  provided by `mise install`) for the 2 zero-dependency gates that run on it:
+  `node scripts/check-docs.mjs` (the docs-integrity gate, also
+  `node scripts/test-check-docs.mjs`, its fixture self-test) and
+  `node scripts/check-corrections.mjs` (the corrections gate, in `make ci`).
+  The 20.x line reached end-of-life on 2026-04-30, and 24 is the Active LTS
 
 ### Commands
 
 ```bash
 make check           # fmt + lint + vet + test + coverage floor — the local gate; run before every PR
-make ci              # canonical local gate: runs make verify first (tidy diff and no go.sum, gofmt, lint at the pin, vet, tests), then unit+e2e tests with the coverage profile, race, cross-arch build of _examples/, the Rust crate (make rust-check) — not a mirror of the GitHub workflow; the CI Verify job runs this target (core ADR-0038, ADR-0044, ADR-0073 form 1)
+make ci              # canonical local gate: runs make verify first (tidy diff and no go.sum, gofmt, lint at the pin, vet, tests), then the corrections gate (make corrections-check, then make corrections-base against BASE when it is set), then unit+e2e tests with the coverage profile, race, cross-arch build of _examples/, and the Rust crate (make rust-check) — not a mirror of the GitHub workflow; the CI Verify job runs this target with BASE set to the pull request's base commit (core ADR-0038, ADR-0044, ADR-0073 form 1)
 make verify          # credential-free, non-mutating gate (what a read-only reviewer runs): tidy diff, gofmt -l, lint at the exact pin, vet, tests
 make test            # unit + e2e; asserts subprocess coverage and writes the in-process coverage profile
 make lint            # golangci-lint run (.golangci.yml), module + _examples/
@@ -87,10 +91,13 @@ make test-coverage-check  # self-test scripts/check-coverage.sh with fixture pro
 make svu-version-check  # fail unless the svu on PATH is the mise.toml pin (make bump runs it first)
 make bump            # tag next semver with svu and push the tag (see Releases)
 make rust-check      # Rust crate in rust/: cargo fmt --check, clippy -D warnings, cargo test, check builds for Windows and macOS, no dependency in cargo tree
+make corrections-check   # the format of every record in .memory/corrections/ (node scripts/check-corrections.mjs, no comparison)
+make corrections-base BASE=<ref>  # also compare the records with BASE: append-only, no record removed, renamed or changed (make ci runs it; CI passes the pull request's base commit)
 go test -v -run TestName ./reporter/   # run a single unit test
 go test -v ./tests/e2e/...             # the example-program e2e suite alone
 node scripts/check-docs.mjs            # docs-integrity gate (index, links, aliases)
 node scripts/test-check-docs.mjs       # self-test the docs-integrity gate with fixture repositories
+node scripts/check-corrections.mjs     # corrections gate: the format of every record (add --base <ref> for the append-only comparison)
 ```
 
 `make ci` is the canonical local gate core ADR-0038 requires, not a
@@ -115,6 +122,20 @@ set:
   enumeration, so the local gate and the hosted one cannot drift apart.
   The same holds for the Rust crate: the last step of `make ci` is `make
   rust-check`, which the workflow's Rust crate job (`rust`) runs too.
+- **Corrections** — the first 2 steps of `make ci`, right after `make verify`,
+  are `make corrections-check` (the format of every record in
+  [.memory/corrections/](.memory/README.md), through
+  [`scripts/check-corrections.mjs`](scripts/check-corrections.mjs)) and `make
+  corrections-base` (the same records compared with `BASE`). The `Verify` job
+  passes `BASE: ${{ github.event.pull_request.base.sha }}` and checks out the
+  full history (`fetch-depth: 0`) for it, so a pull request cannot remove,
+  rename or rewrite a record — only fill an empty `promoted_to` once. On a
+  push or merge-group event `BASE` is empty and the comparison is skipped. The
+  records are 1 file each, never removed or renamed (core ADR-0081).
+  [`scripts/check-corrections.mjs`](scripts/check-corrections.mjs) is a
+  byte-identical copy of frostyard/core's script: change it in core, then copy
+  it, never here. New records are written by core's
+  `scripts/new-correction.mjs`.
 - **Coverage floor** — the workflow's Unit Tests job runs
   `make test-coverage-check` and `make coverage-check` on top of the test run;
   `make ci` does not. Locally that floor belongs to `make check`.
@@ -284,6 +305,13 @@ cargo command runs `--locked`.
   checkout credentials, the top-level permissions) have their own table tests.
   It runs in `go test ./...`, so in `make verify`, `make ci` and CI. A new
   baseline row needs its test here.
+- **Corrections gate guard** —
+  [`tests/baseline/corrections_gate_test.go`](tests/baseline/corrections_gate_test.go)
+  fails when the corrections gate stops being wired: the script is gone, the
+  `ci` rule no longer reaches `corrections-check` and `corrections-base`,
+  `corrections-base` loses its refusal of a `BASE` that does not resolve to a
+  commit, the Node pin is gone, or the workflow's `Verify` job loses `BASE` or
+  `fetch-depth: 0`. It runs in the same `go test ./...` as the baseline rows.
 - New or changed behavior needs a focused test including a failure path;
   exact text formatting is pinned by the tests and by
   [docs/specs/reporter-package.md](docs/specs/reporter-package.md) — change
@@ -312,7 +340,14 @@ core ADR-0038), **Verify** (`make ci`, the canonical gate, in 1 step: form 1
 of ADR-0073, the CI entry of the ADR-0071 row B12; `make ci` runs `make
 verify` first, which covers the tidy diff and the absent `go.sum`, `gofmt`,
 the linter at the pin, `go vet` over the module and the `_examples/`
-programs, and the tests — so the job repeats no step by hand), **Docs
+programs, and the tests — so the job repeats no step by hand. It installs
+Node from `mise.lock` and checks out the full history (`fetch-depth: 0`) so
+that its `BASE: ${{ github.event.pull_request.base.sha }}` resolves: the gate's
+first step after `make verify` is the corrections check, which compares the
+records in [.memory/corrections/](.memory/README.md) with the pull request's
+base commit
+and fails when a record is removed, renamed or changed. On a push or
+merge-group event `BASE` is empty and the comparison is skipped), **Docs
 integrity** (`node scripts/test-check-docs.mjs`, the gate's fixture self-test,
 then `node
 scripts/check-docs.mjs` — every doc indexed in `docs/README.md`, every
@@ -410,8 +445,10 @@ are operator acts (see Agent limits below).
   workflow ask first; `.env` and secrets are unreadable.
 - Corrections that should outlive a session go in
   [.memory/corrections/](.memory/README.md) (1 file for each record, five fields)
-  and are promoted into this file, a doc, or a skill; session continuity
-  goes in [.claude/session-summary.md](.claude/session-summary.md).
+  and are promoted into this file, a doc, or a skill; `make corrections-check`
+  checks the form of every record and `make ci` (with `BASE`) confines a pull
+  request to appending and to filling an empty `promoted_to`; session
+  continuity goes in [.claude/session-summary.md](.claude/session-summary.md).
 - [`SECURITY.md`](SECURITY.md) is the repository's security policy (baseline
   row B14, core ADR-0040): the supported version, GitHub private
   vulnerability reporting, and the scope — the journal transport, the
