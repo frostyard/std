@@ -542,7 +542,7 @@ func TestRecoverPanicMultilineSubprocess(t *testing.T) {
 		t.Fatalf("exit code = %d, want 2; stderr:\n%s", code, stderr)
 	}
 	if !strings.Contains(stderr, "panic: first\n\tsecond [recovered, repanicked]\n") {
-		t.Errorf("stderr does not hold the Go 1.26 multi-line re-panic:\n%s", stderr)
+		t.Errorf("stderr does not hold the Go runtime's multi-line re-panic:\n%s", stderr)
 	}
 	if rec := readRecord(t, c); rec["MESSAGE"] != "first\nsecond" {
 		t.Errorf("MESSAGE = %q", rec["MESSAGE"])
@@ -619,7 +619,7 @@ func TestNestedPanicAfterRecordedSubprocess(t *testing.T) {
 	}
 	const chain = "panic: later failure\n\tpanic: cleanup failure [recovered, repanicked]\n"
 	if !strings.HasPrefix(stderr, chain) {
-		t.Errorf("stderr does not start with the Go 1.26 nested panic chain:\n%s", stderr)
+		t.Errorf("stderr does not start with the Go runtime's nested panic chain:\n%s", stderr)
 	}
 	if rec := readRecord(t, c); rec["MESSAGE"] != "first failure" {
 		t.Errorf("record of panic 1: MESSAGE = %q", rec["MESSAGE"])

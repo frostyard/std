@@ -76,7 +76,7 @@ Beside the Go module, the folder `rust/` holds the Rust crate `frostyard-problem
 ├── .svu.yml               # svu (semantic version utility) config for `make bump`
 ├── .golangci.yml          # What `make lint` and CI run (v2, standard + gofmt)
 ├── .editorconfig
-├── go.mod                 # Module: github.com/frostyard/std, Go 1.26
+├── go.mod                 # Module: github.com/frostyard/std, Go 1.27
 ├── Makefile               # Build/test/lint targets; verify, check and ci are the gate triad
 ├── README.md              # Front page, kind `library` (core ADR-0072)
 ├── SECURITY.md            # Supported versions, private reporting, scope (row B14)
@@ -185,7 +185,7 @@ errors.
   (`_linux.go` files); other OSes get stubs that compile and do nothing, and
   `Read` wraps `errors.ErrUnsupported`.
 
-### Modern Go (1.26)
+### Modern Go (1.27)
 
 The codebase uses modern Go features:
 - `omitzero` struct tags (omit zero-value fields in JSON); `*int` with `omitempty` where zero is a valid value

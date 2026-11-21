@@ -26,6 +26,4 @@ commits instead of copying logs.
 
 ## Next
 
-- The B11 follow-up: move `go.mod`'s toolchain to Go 1.27 with the
-  golangci-lint release the frostyard-go-repo skill's "Fleet toolchain"
-  section names.
+- Nothing queued.

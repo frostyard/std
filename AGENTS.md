@@ -49,8 +49,10 @@ whichever agent you are:
 
 ### Prerequisites
 
-- **Go 1.26.10** (`go.mod`'s `toolchain go1.26.10` line is the only Go pin;
-  CI, `mise`, and Snowcat workers all read it)
+- **Go 1.27.4** (`go.mod`'s `go 1.27.4` line is the only Go pin; CI's
+  `actions/setup-go`, `mise`, and Snowcat workers all read it, and `go.mod`
+  has no `toolchain` line — baseline row B11, core ADR-0043). It is also the
+  minimum Go for a module that imports std.
 - `make`
 - [`mise`](https://mise.jdx.dev/) to provision every other pinned tool:
   `mise install` reads [`mise.toml`](mise.toml) and verifies each download
@@ -245,7 +247,7 @@ cargo command runs `--locked`.
 
 ## Conventions
 
-- Go 1.26; use modern Go syntax (range-over-int, omitzero, etc.)
+- Go 1.27; use modern Go syntax (range-over-int, omitzero, etc.)
 - **No external dependencies — stdlib only.** This is a hard constraint for
   every package in the module; the e2e suite may import only stdlib and
   `github.com/frostyard/std/...`.
@@ -260,9 +262,9 @@ cargo command runs `--locked`.
   (the Makefile and the CI Lint job both read that pin, `mise.lock` carries
   its checksums, and `make lint` warns on a mismatch), so a new finding
   after a deliberate linter bump is fixed in code, never hidden by loosening
-  the config. Bump golangci-lint before bumping `go.mod`'s toolchain, as one
-  change: `make verify` refuses a linter built with an older Go than the
-  toolchain
+  the config. Bump golangci-lint before bumping the Go minor in `go.mod`'s `go`
+  line, as one change: `make verify` refuses a linter built with an older Go
+  minor than that line
 - [`.editorconfig`](.editorconfig) carries the editor defaults (tabs in Go
   and Makefiles, two-space YAML/JSON/Markdown, LF, final newline)
 - Error strings are lowercase without trailing punctuation
@@ -301,8 +303,12 @@ cargo command runs `--locked`.
   `docs/specs/repository-baseline.md`): 1 test per applicable row, B1 to B17,
   reading the tracked tree with `git ls-files -s -z` and the contents from
   disk, and skipping when git is unusable. B9 is exempt (a library: pkg.go.dev
-  documents it) and B11 is a follow-up. The pure checks (the `uses:` pin, the
-  checkout credentials, the top-level permissions) have their own table tests.
+  documents it); B11 (the Go toolchain: `go.mod`'s `go` line as the only Go
+  pin, `mise.lock` at the same release, golangci-lint only from `mise.toml`,
+  and `make lint-version-check` reading the `go` line) is in
+  [`tests/baseline/toolchain_test.go`](tests/baseline/toolchain_test.go).
+  The pure checks (the `uses:` pin, the checkout credentials, the top-level
+  permissions) have their own table tests.
   It runs in `go test ./...`, so in `make verify`, `make ci` and CI. A new
   baseline row needs its test here.
 - **Corrections gate guard** —
