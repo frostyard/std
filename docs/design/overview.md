@@ -65,7 +65,7 @@ Beside the Go module, the folder `rust/` holds the Rust crate `frostyard-problem
 │   ├── risk-paths.json    # The high-risk paths, the level of each and why it is one (core risk-paths spec)
 │   ├── pull_request_template.md, ISSUE_TEMPLATE/, prompts/
 │   ├── copilot-instructions.md -> ../AGENTS.md
-│   └── dependabot.yml     # Dependabot config (Go modules, GitHub Actions, the Rust crate, weekly)
+│   └── dependabot.yml     # Dependabot config (Go modules, GitHub Actions, the Rust crate, monthly)
 ├── policies/agent-governance.json  # Fluent enrollment surface (core repository-surfaces v1)
 ├── scripts/check-docs.mjs # Docs-integrity gate (index, links, aliases; .coverage-thresholds.json)
 ├── scripts/check-corrections.mjs  # Corrections gate (byte-identical copy of core's script; make corrections-check, make corrections-base)
