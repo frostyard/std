@@ -19,7 +19,7 @@ checks, or claim verification passed without evidence from the pull request.
    - **Thread-safety table** — `JSONReporter` is mutex-guarded,
      `TextReporter` is not, `NoopReporter` has no state; a change must not
      silently move a row.
-   - **Go 1.26 idioms** — range-over-int, `omitzero`, `any`, standard
+   - **Go 1.27 idioms** — range-over-int, `omitzero`, `any`, standard
      `testing` only.
 2. Apply every row of the
    [PR review rubric](../../docs/specs/pr-review-rubric.md)

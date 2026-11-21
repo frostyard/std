@@ -167,10 +167,10 @@ an error with the exit status and at most 1024 bytes of stderr.
   or a nested panic chain gives 1 record even when the marker is in the
   file. A duplicate record is better than a lost record.
 - Panic message: the first `panic: ` line plus the tab-indented
-  continuation lines that follow it directly. Go 1.26 prints a multi-line
-  panic value that way (`panic: first`, then a tab and
-  `second [recovered, repanicked]`), so the suffix is on the last line. Go
-  1.26 also prints each nested panic as a continuation line that starts
+  continuation lines that follow it directly. Go 1.26 and 1.27 print a
+  multi-line panic value that way (`panic: first`, then a tab and
+  `second [recovered, repanicked]`), so the suffix is on the last line. They
+  also print each nested panic as a continuation line that starts
   with `panic: ` after its tab (`printpanics`: `panic: later failure`, then
   a tab and `panic: cleanup failure [recovered, repanicked]`); such a block
   is a nested panic chain.
