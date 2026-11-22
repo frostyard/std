@@ -54,7 +54,7 @@ jobs:
       # Snowcat worker's target preparation do, so the three cannot drift.
       # Go still comes from actions/setup-go above (go.mod's `go` line).
       - name: Install pinned tools
-        uses: jdx/mise-action@236a21c3b91f5db6d4e174b348674a0f0caac06d # v5.2.9
+        uses: jdx/mise-action@90f833d396d0cc3674b631d2d225e306476c303a # v5.2.10
         with:
           install: true
           install_args: golangci-lint
@@ -230,7 +230,7 @@ jobs:
       # `mise install` does. Go still comes from actions/setup-go above
       # (go.mod's `go` line).
       - name: Install pinned tools
-        uses: jdx/mise-action@236a21c3b91f5db6d4e174b348674a0f0caac06d # v5.2.9
+        uses: jdx/mise-action@90f833d396d0cc3674b631d2d225e306476c303a # v5.2.10
         with:
           install: true
           install_args: golangci-lint node rust
@@ -263,7 +263,7 @@ jobs:
       # download against the Rust channel manifest (core ADR-0043). The
       # same pin serves `mise install` on a developer machine and a worker.
       - name: Install the pinned Rust toolchain
-        uses: jdx/mise-action@236a21c3b91f5db6d4e174b348674a0f0caac06d # v5.2.9
+        uses: jdx/mise-action@90f833d396d0cc3674b631d2d225e306476c303a # v5.2.10
         with:
           install: true
           install_args: rust
